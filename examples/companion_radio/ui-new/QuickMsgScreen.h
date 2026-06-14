@@ -290,7 +290,7 @@ class QuickMsgScreen : public UIScreen {
         d.fillRect(x + 1, y + 3, 1, 1);
         d.fillRect(x + 2, y + 2, 1, 1);
         d.fillRect(x + 3, y + 1, 1, 1);
-        d.fillRect(x + 4, y,     1, 2);
+        d.fillRect(x + 4, y,     1, 1);
         break;
       case ACK_FAIL:                          // "✗" no confirmation
         for (int i = 0; i < 4; i++) {
