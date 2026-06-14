@@ -481,7 +481,7 @@ void MyMesh::queueMessage(const ContactInfo &from, uint8_t txt_type, mesh::Packe
     _ui->newMsg(path_len, from.name, text, offline_queue_len, from.type, from.id.pub_key);
     _ui->notify(UIEventType::contactMessage);
     if (from.type == ADV_TYPE_CHAT)
-      _ui->addDMMsg(from.id.pub_key, false, text);
+      _ui->addDMMsg(from.id.pub_key, false, text, sender_timestamp);
   }
 #endif
 }
@@ -500,13 +500,20 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* packet) {
     }
   }
   // UI relayed-into-mesh marker: same heard-echo idea, runs regardless of APC.
-  // Gated on _relay_pending so the hash is only computed inside the send window.
-  if (_relay_pending && packet->payload_len == _relay_len) {
+  // Gated on _relay_active so the hash is only computed while a send is pending.
+  if (_relay_active > 0) {
     uint8_t h[MAX_HASH_SIZE];
-    packet->calculatePacketHash(h);
-    if (memcmp(h, _relay_hash, MAX_HASH_SIZE) == 0) {
-      _relay_pending = false;
-      if (_ui) _ui->onChannelRelayed(_relay_seq);
+    bool hashed = false;
+    for (int i = 0; i < RELAY_RING; i++) {
+      RelaySlot& s = _relay[i];
+      if (!s.pending || s.len != packet->payload_len) continue;
+      if (!hashed) { packet->calculatePacketHash(h); hashed = true; }
+      if (memcmp(h, s.hash, MAX_HASH_SIZE) == 0) {
+        s.pending = false;
+        _relay_active--;
+        if (_ui) _ui->onChannelRelayed(s.seq);
+        break;
+      }
     }
   }
   // REVISIT: try to determine which Region (from transport_codes[1]) that Sender is indicating for replies/responses
@@ -1167,12 +1174,16 @@ void MyMesh::apcTrackFloodSend(const mesh::Packet* pkt) {
 // A repeater rebroadcast heard within the window = relayed; no echo = simply not
 // shown as relayed (NOT a failure — direct/0-hop neighbours never echo).
 void MyMesh::trackRelaySend(const mesh::Packet* pkt) {
-  pkt->calculatePacketHash(_relay_hash);
-  _relay_len = pkt->payload_len;
-  _relay_deadline = futureMillis(APC_FLOOD_ECHO_WINDOW_MS);
+  RelaySlot& s = _relay[_relay_head];
+  if (!s.pending) _relay_active++;   // overwriting an empty slot adds one pending
+  pkt->calculatePacketHash(s.hash);
+  s.len = pkt->payload_len;
+  s.deadline = futureMillis(APC_FLOOD_ECHO_WINDOW_MS);
   _relay_seq = (_relay_seq == 0xFFFFFFFFu) ? 1 : _relay_seq + 1;   // never 0 (0 = "no relay")
+  s.seq = _relay_seq;
+  s.pending = true;
   _last_relay_seq = _relay_seq;
-  _relay_pending = true;
+  _relay_head = (_relay_head + 1) % RELAY_RING;
 }
 
 void MyMesh::onSendTimeout() {
@@ -1199,7 +1210,9 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
       _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store), _ui(ui) {
   _iter_started = false;
   _cli_rescue = false;
-  _relay_pending = false;
+  for (int i = 0; i < RELAY_RING; i++) _relay[i].pending = false;
+  _relay_head = 0;
+  _relay_active = 0;
   _relay_seq = 0;
   _last_relay_seq = 0;
   offline_queue_len = 0;
@@ -1250,6 +1263,7 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   _prefs.bot_reply_dm[0] = '\0';
   _prefs.bot_reply_ch[0] = '\0';
   _prefs.dm_show_all = 1;        // show all contacts by default
+  _prefs.dm_resend_count = 2;    // auto-resend on-device DMs twice by default
   memset(_prefs.dm_notif, 0, sizeof(_prefs.dm_notif));
   _prefs.auto_off_secs = 15;    // 15 seconds auto-off by default
   _prefs.clock_hide_seconds = Features::CLOCK_HIDE_SECONDS_DEFAULT ? 1 : 0;
@@ -2682,10 +2696,15 @@ void MyMesh::loop() {
     _apc_flood_pending = false;
     if (_prefs.tx_apc) apcOnFailure();
   }
-  // UI relay window expired with no echo — just drop it (no echo is not a
+  // UI relay windows expired with no echo — just drop them (no echo is not a
   // failure for channels; the marker simply stays "sent").
-  if (_relay_pending && millisHasNowPassed(_relay_deadline)) {
-    _relay_pending = false;
+  if (_relay_active > 0) {
+    for (int i = 0; i < RELAY_RING; i++) {
+      if (_relay[i].pending && millisHasNowPassed(_relay[i].deadline)) {
+        _relay[i].pending = false;
+        _relay_active--;
+      }
+    }
   }
 
   if (_cli_rescue) {

@@ -1380,8 +1380,8 @@ void UITask::onChannelRelayed(uint32_t seq) {
   ((QuickMsgScreen*)quick_msg)->markChannelRelayed(seq);
 }
 
-void UITask::addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) {
-  ((QuickMsgScreen*)quick_msg)->addDMMsg(pub_key, outgoing, text);
+void UITask::addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text, uint32_t sender_timestamp) {
+  ((QuickMsgScreen*)quick_msg)->addDMMsg(pub_key, outgoing, text, sender_timestamp);
 }
 
 int UITask::getDMUnreadTotal() const {
@@ -1610,6 +1610,9 @@ static void formatDashVal(uint8_t field, char* val, int val_len, uint16_t batt_m
 
 void UITask::loop() {
   char c = 0;
+  // Background delivery: resend pending on-device DMs whose ACK timed out, and
+  // finalise the ✗ marker — runs regardless of which screen is active.
+  ((QuickMsgScreen*)quick_msg)->tickDmResends();
 #if UI_HAS_JOYSTICK
   uint8_t joy_rot = _node_prefs ? _node_prefs->joystick_rotation : JOYSTICK_ROTATION;
   int ev = user_btn.check();

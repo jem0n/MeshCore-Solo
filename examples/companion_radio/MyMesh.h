@@ -297,15 +297,23 @@ private:
   uint16_t _apc_flood_len;                 // its payload length — cheap pre-filter before hashing
   uint32_t _apc_flood_deadline;            // echo-wait deadline for that send
   bool _apc_flood_pending;                 // a tracked flood send is awaiting its echo
-  // UI "relayed into mesh" tracker for channel sends — independent of APC, single
-  // slot (only the latest channel send is tracked). Hashing on receive only runs
-  // while a send is pending, so the hot flood-recv path is untouched otherwise.
-  uint8_t  _relay_hash[MAX_HASH_SIZE];
-  uint16_t _relay_len;
-  uint32_t _relay_deadline;
-  uint32_t _relay_seq;        // monotonic id of the pending tracked send
-  uint32_t _last_relay_seq;   // seq of the most recent tracked send (for the UI to record)
-  bool     _relay_pending;
+  // UI "relayed into mesh" tracker for channel sends — independent of APC. A small
+  // ring so a quick burst of channel sends are each tracked (not just the latest).
+  // Hashing on receive only runs while at least one slot is pending, so the hot
+  // flood-recv path is untouched otherwise.
+  static const int RELAY_RING = 4;
+  struct RelaySlot {
+    uint8_t  hash[MAX_HASH_SIZE];
+    uint16_t len;
+    uint32_t deadline;
+    uint32_t seq;
+    bool     pending;
+  };
+  RelaySlot _relay[RELAY_RING];
+  int      _relay_head;        // next ring slot to overwrite
+  int      _relay_active;      // number of slots currently pending (cheap gate)
+  uint32_t _relay_seq;         // monotonic id counter for tracked sends
+  uint32_t _last_relay_seq;    // seq of the most recent tracked send (for the UI to record)
   bool send_unscoped;   // force un-scoped flood (instead of using send_scope)
   char cli_command[80];
   uint8_t app_target_ver;
