@@ -884,6 +884,12 @@ public:
           int ret = _dm_fs.render(display, sender, e.text,
                                   _dm_hist_sel < dm_count - 1,
                                   _dm_hist_sel > 0);
+          if (e.outgoing) {  // delivery marker in the (inverted) header bar
+            display.setColor(DisplayDriver::DARK);
+            drawAckGlyph(display, 2 + display.getTextWidth(sender) + 3, 1,
+                         dmEffectiveStatus(e));
+            display.setColor(DisplayDriver::LIGHT);
+          }
           if (_ctx_menu.active) _ctx_menu.render(display);
           return ret;
         }
@@ -1016,6 +1022,12 @@ public:
           int ret = _fs.render(display, fsender, fmsg,
                                _hist_sel < fs_hist_count - 1,
                                _hist_sel > 0);
+          // Channels: ✓ only once a repeater echo confirms relay (see list view).
+          if (strcmp(fsender, "Me") == 0 && _hist[ring_pos].relay_status == ACK_OK) {
+            display.setColor(DisplayDriver::DARK);
+            drawAckGlyph(display, 2 + display.getTextWidth(fsender) + 3, 1, ACK_OK);
+            display.setColor(DisplayDriver::LIGHT);
+          }
           if (_ctx_menu.active) _ctx_menu.render(display);
           return ret;
         }
