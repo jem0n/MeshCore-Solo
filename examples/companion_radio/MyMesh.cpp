@@ -1186,7 +1186,12 @@ void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
   bool mine = isAckPending(ack_crc);
   BaseChatMesh::onAckRecv(packet, ack_crc);
   if (mine && _prefs.tx_apc) apcSampleSnr(radio_driver.getLastSNR());
-  if (mine && _ui) _ui->onMsgAck(ack_crc);   // drive DM delivery-status marker
+  // Drive the DM delivery-status marker. Note isAckPending() only covers
+  // app/serial-initiated sends (expected_ack_table); a DM composed on the
+  // device UI registers in BaseChatMesh's own ack table instead, so gating on
+  // `mine` here would leave every on-device DM stuck at ✗. The UI matches the
+  // crc against its own pending tag, so an unrelated/overheard ACK is ignored.
+  if (_ui) _ui->onMsgAck(ack_crc);
 }
 
 MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store, AbstractUITask* ui)
