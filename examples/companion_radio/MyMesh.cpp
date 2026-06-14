@@ -1160,9 +1160,10 @@ void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
   // onAckRecv also fires for ACKs we merely route or overhear (see Mesh.cpp), whose
   // SNR belongs to an unrelated link — only feed APC for ACKs to our own sends.
   // Capture the match before the base handler's processAck() clears the entry.
-  bool ours = _prefs.tx_apc && isAckPending(ack_crc);
+  bool mine = isAckPending(ack_crc);
   BaseChatMesh::onAckRecv(packet, ack_crc);
-  if (ours) apcSampleSnr(radio_driver.getLastSNR());
+  if (mine && _prefs.tx_apc) apcSampleSnr(radio_driver.getLastSNR());
+  if (mine && _ui) _ui->onMsgAck(ack_crc);   // drive DM delivery-status marker
 }
 
 MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store, AbstractUITask* ui)

@@ -28,6 +28,10 @@ class QuickMsgScreen : public UIScreen {
   int _sel_channel_idx;
   bool _sending_to_channel;
 
+  // Carries the just-sent DM's ACK tag + deadline from sendText() to afterSend().
+  uint32_t _last_ack_tag = 0;
+  uint32_t _last_ack_deadline_ms = 0;
+
   // MSG_PICK (shared)
   int _msg_sel, _msg_scroll;
   int _active_msgs[QUICK_MSGS_MAX];
@@ -85,12 +89,25 @@ class QuickMsgScreen : public UIScreen {
   // UTF-8 bytes) get their tail clipped.
   static const int MSG_TEXT_BUF = MAX_TEXT_LEN + 1;
 
+  // Outgoing-message delivery state. DM: a real end-to-end ACK (✓ delivered to
+  // the recipient). Channel: only a "relayed into mesh" echo from a repeater (no
+  // recipient ACK exists for floods), so a missing echo is NOT shown as failure.
+  enum AckState : uint8_t { ACK_NONE = 0, ACK_PENDING, ACK_OK, ACK_FAIL };
+
   struct ChHistEntry { uint8_t ch_idx; char text[MSG_TEXT_BUF]; uint32_t timestamp; };
   ChHistEntry _hist[CH_HIST_MAX];
   int _hist_head, _hist_count;
 
   // DM_HIST
-  struct DmHistEntry { uint8_t prefix[4]; uint8_t outgoing; char text[MSG_TEXT_BUF]; uint32_t timestamp; };
+  struct DmHistEntry {
+    uint8_t  prefix[4];
+    uint8_t  outgoing;
+    char     text[MSG_TEXT_BUF];
+    uint32_t timestamp;
+    uint8_t  ack_status;       // AckState; meaningful only when outgoing
+    uint32_t ack_tag;          // expected_ack CRC to match against onMsgAck()
+    uint32_t ack_deadline_ms;  // millis() by which a pending ACK must arrive
+  };
   static const int DM_HIST_MAX = 64;
   DmHistEntry _dm_hist[DM_HIST_MAX];
   int _dm_hist_head, _dm_hist_count;
@@ -252,7 +269,37 @@ class QuickMsgScreen : public UIScreen {
     return -1;
   }
 
-  void storeDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) {
+  // Small font-independent delivery marker, drawn with the current ink colour
+  // in a ~5x5 box. No font has a usable check/cross glyph, so draw them.
+  static void drawAckGlyph(DisplayDriver& d, int x, int top_y, AckState s) {
+    int lh = d.getLineHeight();
+    int y  = top_y + (lh - 5) / 2;
+    if (y < top_y) y = top_y;
+    switch (s) {
+      case ACK_PENDING:                       // "·" awaiting ACK
+        d.fillRect(x + 1, y + 3, 2, 2);
+        break;
+      case ACK_OK:                            // "✓" delivered / relayed
+        d.fillRect(x,     y + 2, 1, 1);
+        d.fillRect(x + 1, y + 3, 1, 1);
+        d.fillRect(x + 2, y + 2, 1, 1);
+        d.fillRect(x + 3, y + 1, 1, 1);
+        d.fillRect(x + 4, y,     1, 2);
+        break;
+      case ACK_FAIL:                          // "✗" no confirmation
+        for (int i = 0; i < 4; i++) {
+          d.fillRect(x + i,     y + i, 1, 1);
+          d.fillRect(x + 3 - i, y + i, 1, 1);
+        }
+        break;
+      default: break;                          // ACK_NONE → nothing
+    }
+  }
+
+  // ack_tag != 0 marks an outgoing DM as awaiting an end-to-end ACK by
+  // ack_deadline_ms; 0 means "sent, no confirmation possible" (no path / incoming).
+  void storeDMMsg(const uint8_t* pub_key, bool outgoing, const char* text,
+                  uint32_t ack_tag = 0, uint32_t ack_deadline_ms = 0) {
     int pos;
     if (_dm_hist_count < DM_HIST_MAX) {
       pos = (_dm_hist_head + _dm_hist_count) % DM_HIST_MAX;
@@ -266,6 +313,17 @@ class QuickMsgScreen : public UIScreen {
     _dm_hist[pos].timestamp = rtc_clock.getCurrentTime();
     strncpy(_dm_hist[pos].text, text, sizeof(DmHistEntry::text) - 1);
     _dm_hist[pos].text[sizeof(DmHistEntry::text) - 1] = '\0';
+    _dm_hist[pos].ack_status      = (outgoing && ack_tag) ? ACK_PENDING : ACK_NONE;
+    _dm_hist[pos].ack_tag         = ack_tag;
+    _dm_hist[pos].ack_deadline_ms = ack_deadline_ms;
+  }
+
+  // Effective status for display: a pending ACK past its deadline reads as
+  // failed (no separate timer needed — evaluated lazily at render time).
+  AckState dmEffectiveStatus(const DmHistEntry& e) const {
+    if (e.ack_status == ACK_PENDING && (int32_t)(millis() - e.ack_deadline_ms) >= 0)
+      return ACK_FAIL;
+    return (AckState)e.ack_status;
   }
 
   int dmHistCountForContact(const uint8_t* prefix) const {
@@ -304,7 +362,7 @@ class QuickMsgScreen : public UIScreen {
       _viewing_max_seen = 0;
       _task->showAlert("Sent!", 600);
     } else if (ok) {
-      storeDMMsg(_sel_contact.id.pub_key, true, msg);
+      storeDMMsg(_sel_contact.id.pub_key, true, msg, _last_ack_tag, _last_ack_deadline_ms);
       _dm_hist_sel = 0;
       _dm_hist_scroll = 0;
       _phase = DM_HIST;
@@ -316,6 +374,8 @@ class QuickMsgScreen : public UIScreen {
   }
 
   bool sendText(const char* msg) {
+    _last_ack_tag = 0;
+    _last_ack_deadline_ms = 0;
     if (_sending_to_channel) {
       ChannelDetails ch;
       if (!the_mesh.getChannel(_sel_channel_idx, ch)) return false;
@@ -323,8 +383,15 @@ class QuickMsgScreen : public UIScreen {
                                        the_mesh.getNodeName(), msg, strlen(msg));
     } else {
       uint32_t expected_ack = 0, est_timeout = 0;
-      return the_mesh.sendMessage(_sel_contact, rtc_clock.getCurrentTime(), 0,
-                                  msg, expected_ack, est_timeout) > 0;
+      bool ok = the_mesh.sendMessage(_sel_contact, rtc_clock.getCurrentTime(), 0,
+                                     msg, expected_ack, est_timeout) > 0;
+      if (ok && expected_ack) {
+        _last_ack_tag = expected_ack;
+        // Generous margin over the base estimate so a slow multi-hop ACK isn't
+        // prematurely shown as failed.
+        _last_ack_deadline_ms = millis() + est_timeout + 4000;
+      }
+      return ok;
     }
   }
 
@@ -533,6 +600,19 @@ public:
 
   void addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) {
     storeDMMsg(pub_key, outgoing, text);
+  }
+
+  // Called when an end-to-end ACK arrives (routed from MyMesh::onAckRecv).
+  // Marks the matching pending outgoing DM as delivered.
+  void markDmDelivered(uint32_t ack_crc) {
+    if (ack_crc == 0) return;
+    for (int i = 0; i < _dm_hist_count; i++) {
+      DmHistEntry& e = _dm_hist[(_dm_hist_head + i) % DM_HIST_MAX];
+      if (e.outgoing && e.ack_status == ACK_PENDING && e.ack_tag == ack_crc) {
+        e.ack_status = ACK_OK;
+        return;
+      }
+    }
   }
 
   int getDMUnreadTotal() const {
@@ -846,6 +926,10 @@ public:
           display.setColor(DisplayDriver::DARK);
         }
         display.drawTextEllipsized(3, y + 1, display.width() - cw - 2 - age_w, sender);
+        if (e.outgoing) {                       // delivery marker after "Me"
+          int gx = 3 + display.getTextWidth(sender) + 3;
+          drawAckGlyph(display, gx, y + 1, dmEffectiveStatus(e));
+        }
         if (age[0]) { display.setCursor(display.width() - age_w, y + 1); display.print(age); }
         if (!sel) display.setColor(DisplayDriver::LIGHT);
         if (portrait_expand) {

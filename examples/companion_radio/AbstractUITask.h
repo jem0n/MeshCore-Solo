@@ -41,6 +41,9 @@ public:
   }
   bool hasConnection() const { return _connected; }
   virtual void onBLEDisconnected() {}
+  // An end-to-end ACK (CRC) arrived for one of our sent messages — drives the
+  // DM delivery-status marker. Default no-op for UIs that don't track it.
+  virtual void onMsgAck(uint32_t ack_crc) { (void)ack_crc; }
   // True only when a BLE central is actually bonded/connected. On a dual
   // (BLE+USB) interface hasConnection() is always true (USB counts), so use
   // this for BLE-specific UI like the pairing-PIN prompt.
