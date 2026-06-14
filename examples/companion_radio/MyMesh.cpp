@@ -499,6 +499,16 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* packet) {
       apcSampleSnr(packet->getSNR());
     }
   }
+  // UI relayed-into-mesh marker: same heard-echo idea, runs regardless of APC.
+  // Gated on _relay_pending so the hash is only computed inside the send window.
+  if (_relay_pending && packet->payload_len == _relay_len) {
+    uint8_t h[MAX_HASH_SIZE];
+    packet->calculatePacketHash(h);
+    if (memcmp(h, _relay_hash, MAX_HASH_SIZE) == 0) {
+      _relay_pending = false;
+      if (_ui) _ui->onChannelRelayed(_relay_seq);
+    }
+  }
   // REVISIT: try to determine which Region (from transport_codes[1]) that Sender is indicating for replies/responses
   //    if unknown, fallback to finding Region from transport_codes[0], the 'scope' used by Sender
   return false;
@@ -534,6 +544,7 @@ void MyMesh::sendFloodScoped(const ContactInfo& recipient, mesh::Packet* pkt, ui
 void MyMesh::sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t delay_millis) {
   // TODO: have per-channel send_scope
   if (_prefs.tx_apc) apcTrackFloodSend(pkt);   // listen for a repeater echo to drive APC (channels have no ACK)
+  trackRelaySend(pkt);                          // and for the UI "relayed" marker
   if (send_unscoped) {
     sendFlood(pkt, delay_millis, _prefs.path_hash_mode + 1);  // app has explicitly requested un-scoped
   } else {
@@ -1152,6 +1163,18 @@ void MyMesh::apcTrackFloodSend(const mesh::Packet* pkt) {
   _apc_flood_pending = true;
 }
 
+// Arm the UI "relayed into mesh" tracker for a channel send (independent of APC).
+// A repeater rebroadcast heard within the window = relayed; no echo = simply not
+// shown as relayed (NOT a failure — direct/0-hop neighbours never echo).
+void MyMesh::trackRelaySend(const mesh::Packet* pkt) {
+  pkt->calculatePacketHash(_relay_hash);
+  _relay_len = pkt->payload_len;
+  _relay_deadline = futureMillis(APC_FLOOD_ECHO_WINDOW_MS);
+  _relay_seq = (_relay_seq == 0xFFFFFFFFu) ? 1 : _relay_seq + 1;   // never 0 (0 = "no relay")
+  _last_relay_seq = _relay_seq;
+  _relay_pending = true;
+}
+
 void MyMesh::onSendTimeout() {
   if (_prefs.tx_apc) apcOnFailure();
 }
@@ -1171,6 +1194,9 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
       _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store), _ui(ui) {
   _iter_started = false;
   _cli_rescue = false;
+  _relay_pending = false;
+  _relay_seq = 0;
+  _last_relay_seq = 0;
   offline_queue_len = 0;
   app_target_ver = 0;
   _bot_last_dm_reply_ms = 0;
@@ -2650,6 +2676,11 @@ void MyMesh::loop() {
   if (_apc_flood_pending && millisHasNowPassed(_apc_flood_deadline)) {
     _apc_flood_pending = false;
     if (_prefs.tx_apc) apcOnFailure();
+  }
+  // UI relay window expired with no echo — just drop it (no echo is not a
+  // failure for channels; the marker simply stays "sent").
+  if (_relay_pending && millisHasNowPassed(_relay_deadline)) {
+    _relay_pending = false;
   }
 
   if (_cli_rescue) {

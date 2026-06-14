@@ -94,7 +94,13 @@ class QuickMsgScreen : public UIScreen {
   // recipient ACK exists for floods), so a missing echo is NOT shown as failure.
   enum AckState : uint8_t { ACK_NONE = 0, ACK_PENDING, ACK_OK, ACK_FAIL };
 
-  struct ChHistEntry { uint8_t ch_idx; char text[MSG_TEXT_BUF]; uint32_t timestamp; };
+  struct ChHistEntry {
+    uint8_t  ch_idx;
+    char     text[MSG_TEXT_BUF];
+    uint32_t timestamp;
+    uint8_t  relay_status;   // AckState; only PENDING/OK used (no failure for floods)
+    uint32_t relay_seq;      // MyMesh relay seq to match against onChannelRelayed()
+  };
   ChHistEntry _hist[CH_HIST_MAX];
   int _hist_head, _hist_count;
 
@@ -354,7 +360,13 @@ class QuickMsgScreen : public UIScreen {
       _phase = CHANNEL_HIST;  // set before addChannelMsg so viewing=true, no unread bump
       char entry[sizeof(ChHistEntry::text)];
       snprintf(entry, sizeof(entry), "Me: %s", msg);
-      addChannelMsg(_sel_channel_idx, entry);
+      int pos = addChannelMsg(_sel_channel_idx, entry);
+      // Arm the "relayed into mesh" marker on this exact entry — MyMesh tracked
+      // the flood it just originated and reports a heard repeater echo by seq.
+      if (pos >= 0) {
+        _hist[pos].relay_status = ACK_PENDING;
+        _hist[pos].relay_seq    = the_mesh.lastChannelRelaySeq();
+      }
       // After inserting sent msg at index 0, the unread index range is stale.
       // User is active in this channel — treat as fully read.
       _ch_unread[_sel_channel_idx] = 0;
@@ -570,11 +582,13 @@ public:
     memset(_ch_unread, 0, sizeof(_ch_unread));
   }
 
-  void addChannelMsg(uint8_t ch_idx, const char* text) {
+  // Returns the ring position the message was stored at, or -1 if rejected, so
+  // the outgoing path can attach a relay seq to that exact entry.
+  int addChannelMsg(uint8_t ch_idx, const char* text) {
     // Guard against bogus channel indices (e.g. findChannelIdx() returned -1
     // and was cast to uint8_t → 255). Storing such an entry would burn a ring
     // slot for a message that no visible channel can ever surface.
-    if (ch_idx >= MAX_GROUP_CHANNELS) return;
+    if (ch_idx >= MAX_GROUP_CHANNELS) return -1;
     int pos;
     if (_hist_count < CH_HIST_MAX) {
       pos = (_hist_head + _hist_count) % CH_HIST_MAX;
@@ -593,9 +607,24 @@ public:
     _hist[pos].timestamp = rtc_clock.getCurrentTime();
     strncpy(_hist[pos].text, text, sizeof(_hist[pos].text) - 1);
     _hist[pos].text[sizeof(_hist[pos].text) - 1] = '\0';
+    _hist[pos].relay_status = ACK_NONE;
+    _hist[pos].relay_seq = 0;
 
     bool viewing = (_phase == CHANNEL_HIST && _sel_channel_idx == (int)ch_idx);
     if (!viewing && _ch_unread[ch_idx] < 99) _ch_unread[ch_idx]++;
+    return pos;
+  }
+
+  // Called when a repeater echo of one of our channel sends is heard.
+  void markChannelRelayed(uint32_t seq) {
+    if (seq == 0) return;
+    for (int i = 0; i < _hist_count; i++) {
+      ChHistEntry& e = _hist[(_hist_head + i) % CH_HIST_MAX];
+      if (e.relay_status == ACK_PENDING && e.relay_seq == seq) {
+        e.relay_status = ACK_OK;
+        return;
+      }
+    }
   }
 
   void addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) {
@@ -1073,6 +1102,13 @@ public:
           display.setColor(DisplayDriver::DARK);
         }
         display.drawTextEllipsized(3, y + 1, display.width() - cw - 2 - age_w, sender);
+        // Channels have no recipient ACK — only show ✓ once a repeater echo
+        // confirms the send was relayed into the mesh; otherwise no marker
+        // (absence is normal, not a failure).
+        if (strcmp(sender, "Me") == 0 && _hist[ring_pos].relay_status == ACK_OK) {
+          int gx = 3 + display.getTextWidth(sender) + 3;
+          drawAckGlyph(display, gx, y + 1, ACK_OK);
+        }
         if (age[0]) { display.setCursor(display.width() - age_w, y + 1); display.print(age); }
         if (!sel) display.setColor(DisplayDriver::LIGHT);
         if (portrait_expand) {

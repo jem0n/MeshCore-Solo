@@ -44,6 +44,9 @@ public:
   // An end-to-end ACK (CRC) arrived for one of our sent messages — drives the
   // DM delivery-status marker. Default no-op for UIs that don't track it.
   virtual void onMsgAck(uint32_t ack_crc) { (void)ack_crc; }
+  // A repeater rebroadcast of one of our channel sends was heard (seq from
+  // lastChannelRelaySeq()) — drives the channel "relayed into mesh" marker.
+  virtual void onChannelRelayed(uint32_t seq) { (void)seq; }
   // True only when a BLE central is actually bonded/connected. On a dual
   // (BLE+USB) interface hasConnection() is always true (USB counts), so use
   // this for BLE-specific UI like the pairing-PIN prompt.

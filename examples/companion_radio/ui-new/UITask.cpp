@@ -1376,6 +1376,10 @@ void UITask::onMsgAck(uint32_t ack_crc) {
   ((QuickMsgScreen*)quick_msg)->markDmDelivered(ack_crc);
 }
 
+void UITask::onChannelRelayed(uint32_t seq) {
+  ((QuickMsgScreen*)quick_msg)->markChannelRelayed(seq);
+}
+
 void UITask::addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) {
   ((QuickMsgScreen*)quick_msg)->addDMMsg(pub_key, outgoing, text);
 }

@@ -173,6 +173,7 @@ public:
   void addChannelMsg(uint8_t channel_idx, const char* text) override;
   void addDMMsg(const uint8_t* pub_key, bool outgoing, const char* text) override;
   void onMsgAck(uint32_t ack_crc) override;
+  void onChannelRelayed(uint32_t seq) override;
   int  getDMUnreadTotal() const;
   int  getMsgCount() const { return _msgcount; }
   int  getChannelUnreadCount() const;
