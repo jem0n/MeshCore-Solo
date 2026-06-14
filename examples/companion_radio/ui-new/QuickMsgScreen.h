@@ -3,6 +3,7 @@
 // Included by UITask.cpp after SettingsScreen.h is defined.
 
 #include "NavView.h"   // navigate to a location shared inside a message
+#include "icons.h"     // scalable mini-icons (delivery markers)
 
 class QuickMsgScreen : public UIScreen {
   UITask* _task;
@@ -283,31 +284,14 @@ class QuickMsgScreen : public UIScreen {
     return -1;
   }
 
-  // Small font-independent delivery marker, drawn with the current ink colour
-  // in a ~5px box. No font has a usable check/cross glyph, so draw them.
-  // `sends` (pending only) = how many times the DM has been transmitted: one dot
-  // per send, so the row grows by a dot with each auto-resend.
+  // Delivery marker, drawn with the current ink colour and auto-scaled to the
+  // font (see icons.h). Pending = a row of dots, one per send (so it grows with
+  // each auto-resend); delivered = ✓; failed = ✗; ACK_NONE = nothing.
   static void drawAckGlyph(DisplayDriver& d, int x, int top_y, AckState s, int sends = 1) {
-    int lh = d.getLineHeight();
-    int y  = top_y + (lh - 5) / 2;
-    if (y < top_y) y = top_y;
     switch (s) {
-      case ACK_PENDING:                       // "·· …" awaiting ACK, one dot per send
-        for (int i = 0; i < sends; i++) d.fillRect(x + i * 3, y + 3, 2, 2);
-        break;
-      case ACK_OK:                            // "✓" delivered / relayed
-        d.fillRect(x,     y + 2, 1, 1);
-        d.fillRect(x + 1, y + 3, 1, 1);
-        d.fillRect(x + 2, y + 2, 1, 1);
-        d.fillRect(x + 3, y + 1, 1, 1);
-        d.fillRect(x + 4, y,     1, 1);
-        break;
-      case ACK_FAIL:                          // "✗" no confirmation
-        for (int i = 0; i < 4; i++) {
-          d.fillRect(x + i,     y + i, 1, 1);
-          d.fillRect(x + 3 - i, y + i, 1, 1);
-        }
-        break;
+      case ACK_PENDING: miniIconDotRow(d, x, top_y, sends);          break;
+      case ACK_OK:      miniIconDraw(d, x, top_y, ICON_CHECK, 5, 4); break;
+      case ACK_FAIL:    miniIconDraw(d, x, top_y, ICON_CROSS, 4, 4); break;
       default: break;                          // ACK_NONE → nothing
     }
   }
