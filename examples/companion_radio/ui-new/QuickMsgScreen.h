@@ -284,14 +284,16 @@ class QuickMsgScreen : public UIScreen {
   }
 
   // Small font-independent delivery marker, drawn with the current ink colour
-  // in a ~5x5 box. No font has a usable check/cross glyph, so draw them.
-  static void drawAckGlyph(DisplayDriver& d, int x, int top_y, AckState s) {
+  // in a ~5px box. No font has a usable check/cross glyph, so draw them.
+  // `sends` (pending only) = how many times the DM has been transmitted: one dot
+  // per send, so the row grows by a dot with each auto-resend.
+  static void drawAckGlyph(DisplayDriver& d, int x, int top_y, AckState s, int sends = 1) {
     int lh = d.getLineHeight();
     int y  = top_y + (lh - 5) / 2;
     if (y < top_y) y = top_y;
     switch (s) {
-      case ACK_PENDING:                       // "·" awaiting ACK
-        d.fillRect(x + 1, y + 3, 2, 2);
+      case ACK_PENDING:                       // "·· …" awaiting ACK, one dot per send
+        for (int i = 0; i < sends; i++) d.fillRect(x + i * 3, y + 3, 2, 2);
         break;
       case ACK_OK:                            // "✓" delivered / relayed
         d.fillRect(x,     y + 2, 1, 1);
@@ -962,7 +964,7 @@ public:
           if (e.outgoing) {  // delivery marker in the (inverted) header bar
             display.setColor(DisplayDriver::DARK);
             drawAckGlyph(display, 2 + display.getTextWidth(sender) + 3, 1,
-                         dmEffectiveStatus(e));
+                         dmEffectiveStatus(e), e.attempt + 1);
             display.setColor(DisplayDriver::LIGHT);
           }
           if (_ctx_menu.active) _ctx_menu.render(display);
@@ -1038,7 +1040,7 @@ public:
         display.drawTextEllipsized(3, y + 1, display.width() - cw - 2 - age_w, sender);
         if (e.outgoing) {                       // delivery marker after "Me"
           int gx = 3 + display.getTextWidth(sender) + 3;
-          drawAckGlyph(display, gx, y + 1, dmEffectiveStatus(e));
+          drawAckGlyph(display, gx, y + 1, dmEffectiveStatus(e), e.attempt + 1);
         }
         if (age[0]) { display.setCursor(display.width() - age_w, y + 1); display.print(age); }
         if (!sel) display.setColor(DisplayDriver::LIGHT);
