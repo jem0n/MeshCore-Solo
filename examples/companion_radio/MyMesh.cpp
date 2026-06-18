@@ -1818,9 +1818,15 @@ void MyMesh::handleCmdFrame(size_t len) {
       repeat = cmd_frame[i++];   // FIRMWARE_VER_CODE  9+
     }
 
-    if (repeat && !isValidClientRepeatFreq(freq)) {
-      writeErrFrame(ERR_CODE_ILLEGAL_ARG);
-    } else if (freq >= 150000 && freq <= 2500000 && sf >= 5 && sf <= 12 && cr >= 5 && cr <= 8 && bw >= 7000 &&
+    // Dedicated-band requirement for app-driven repeat disabled, to match the
+    // on-device Repeater toggle (Settings > Radio), which repeats on whatever
+    // frequency is already set with no band restriction. Uncomment to restore
+    // the old behaviour (repeat=1 only accepted on repeat_freq_ranges, i.e.
+    // 433.000/869.495/918.000 MHz exactly, by default).
+    // if (repeat && !isValidClientRepeatFreq(freq)) {
+    //   writeErrFrame(ERR_CODE_ILLEGAL_ARG);
+    // } else
+    if (freq >= 150000 && freq <= 2500000 && sf >= 5 && sf <= 12 && cr >= 5 && cr <= 8 && bw >= 7000 &&
         bw <= 500000) {
       _prefs.sf = sf;
       _prefs.cr = cr;

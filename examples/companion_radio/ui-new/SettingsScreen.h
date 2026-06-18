@@ -140,16 +140,16 @@ class SettingsScreen : public UIScreen {
   }
 
   // Position of the current settings within the popup list built by
-  // openPresetMenu() below (built-ins first, then non-empty user slots in
-  // slot order) — or -1 ("Custom") if nothing matches.
+  // openPresetMenu() below ("Save current..." at 0, then built-ins, then
+  // non-empty user slots in slot order) — or -1 ("Custom") if nothing matches.
   int currentPresetListIndex() {
     NodePrefs* p = _task->getNodePrefs();
     if (!p) return -1;
     for (int i = 0; i < RADIO_PRESET_COUNT; i++) {
       const RadioPreset& r = RADIO_PRESETS[i];
-      if (matchesPreset(p, r.freq, r.bw, r.sf, r.cr)) return i;
+      if (matchesPreset(p, r.freq, r.bw, r.sf, r.cr)) return i + 1;
     }
-    int pos = RADIO_PRESET_COUNT;
+    int pos = RADIO_PRESET_COUNT + 1;
     for (int i = 0; i < NodePrefs::USER_RADIO_PRESET_MAX; i++) {
       const auto& u = p->user_radio_presets[i];
       if (!u.name[0]) continue;
@@ -716,11 +716,16 @@ class SettingsScreen : public UIScreen {
   // NodePrefs::user_radio_presets (empty slots are skipped when building the list).
   uint8_t _preset_user_slot[NodePrefs::USER_RADIO_PRESET_MAX];
   int     _preset_user_count = 0;
-  bool    _preset_saving = false;  // _kb is open to name a new preset, not a msg slot
+  bool    _preset_saving = false;   // _kb is open to name a new preset, not a msg slot
+  bool    _preset_deleting = false; // _preset_menu is showing the delete sub-list
 
+  // Layout: [0]="+ Save current...", [1..RADIO_PRESET_COUNT]=built-ins,
+  // [..+_preset_user_count]=saved user presets, ["- Delete preset..." if any].
   void openPresetMenu() {
     NodePrefs* p = _task->getNodePrefs();
+    _preset_deleting = false;
     _preset_menu.begin("Radio Preset", 6);
+    _preset_menu.addItem("+ Save current...");
     for (int i = 0; i < RADIO_PRESET_COUNT; i++) _preset_menu.addItem(RADIO_PRESETS[i].name);
     _preset_user_count = 0;
     if (p) {
@@ -730,9 +735,20 @@ class SettingsScreen : public UIScreen {
         _preset_user_slot[_preset_user_count++] = (uint8_t)i;
       }
     }
-    _preset_menu.addItem("+ Save current...");
+    if (_preset_user_count > 0) _preset_menu.addItem("- Delete preset...");
     int idx = currentPresetListIndex();
     _preset_menu.setSelected(idx >= 0 ? idx : 0);
+  }
+
+  // Reuses _preset_menu for a second-level list of just the saved user presets
+  // (their slot mapping in _preset_user_slot is still the one openPresetMenu()
+  // just built, since this is only reached from within that same popup).
+  void openDeletePresetMenu() {
+    NodePrefs* p = _task->getNodePrefs();
+    _preset_menu.begin("Delete Preset", 6);
+    for (int i = 0; i < _preset_user_count; i++)
+      _preset_menu.addItem(p->user_radio_presets[_preset_user_slot[i]].name);
+    _preset_deleting = true;
   }
 
 public:
@@ -806,27 +822,42 @@ public:
       return true;
     }
 
-    // Radio preset popup
+    // Radio preset popup (and its "delete a saved preset" sub-list)
     if (_preset_menu.active) {
       auto res = _preset_menu.handleInput(c);
       if (res == PopupMenu::SELECTED && p) {
         int idx = _preset_menu.selectedIndex();
-        int user_base = RADIO_PRESET_COUNT;
-        int save_idx  = RADIO_PRESET_COUNT + _preset_user_count;
-        if (idx >= 0 && idx < user_base) {
-          const RadioPreset& r = RADIO_PRESETS[idx];
-          p->freq = r.freq; p->bw = r.bw; p->sf = r.sf; p->cr = r.cr;
-          _task->applyRadioParams();
-          _dirty = true;
-        } else if (idx >= user_base && idx < save_idx) {
-          const NodePrefs::UserRadioPreset& u = p->user_radio_presets[_preset_user_slot[idx - user_base]];
-          p->freq = u.freq; p->bw = u.bw; p->sf = u.sf; p->cr = u.cr;
-          _task->applyRadioParams();
-          _dirty = true;
-        } else if (idx == save_idx) {
-          _preset_saving = true;
-          _kb->begin("", (int)sizeof(p->user_radio_presets[0].name) - 1);
+        if (_preset_deleting) {
+          if (idx >= 0 && idx < _preset_user_count) {
+            p->user_radio_presets[_preset_user_slot[idx]].name[0] = '\0';
+            _dirty = true;
+            _task->showAlert("Preset deleted", 800);
+          }
+          _preset_deleting = false;
+        } else {
+          int save_idx     = 0;
+          int builtin_base = 1;
+          int user_base    = builtin_base + RADIO_PRESET_COUNT;
+          int delete_idx   = user_base + _preset_user_count;
+          if (idx == save_idx) {
+            _preset_saving = true;
+            _kb->begin("", (int)sizeof(p->user_radio_presets[0].name) - 1);
+          } else if (idx >= builtin_base && idx < user_base) {
+            const RadioPreset& r = RADIO_PRESETS[idx - builtin_base];
+            p->freq = r.freq; p->bw = r.bw; p->sf = r.sf; p->cr = r.cr;
+            _task->applyRadioParams();
+            _dirty = true;
+          } else if (idx >= user_base && idx < delete_idx) {
+            const NodePrefs::UserRadioPreset& u = p->user_radio_presets[_preset_user_slot[idx - user_base]];
+            p->freq = u.freq; p->bw = u.bw; p->sf = u.sf; p->cr = u.cr;
+            _task->applyRadioParams();
+            _dirty = true;
+          } else if (_preset_user_count > 0 && idx == delete_idx) {
+            openDeletePresetMenu();
+          }
         }
+      } else if (res == PopupMenu::CANCELLED) {
+        _preset_deleting = false;
       }
       return true;
     }
