@@ -20,7 +20,7 @@ class DiagnosticsScreen : public UIScreen {
   int _scroll = 0;
 
   struct Row { const char* label; char value[20]; };
-  static const int MAX_ROWS = 12;
+  static const int MAX_ROWS = 13;
   Row _rows[MAX_ROWS];
   int _row_count = 0;
 
@@ -75,6 +75,9 @@ class DiagnosticsScreen : public UIScreen {
     addRxTxRow("Advert",  adv_rx, adv_tx);
     addRxTxRow("Ack/Path", rte_rx, rte_tx);
     addRxTxRow("Other",   oth_rx, oth_tx);
+
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)the_mesh.getNumForwarded());
+    addRow("Forwarded", buf);
 
     uint32_t heap_free, heap_total;
     DeviceDiag::getHeapStats(heap_free, heap_total);

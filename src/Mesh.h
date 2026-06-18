@@ -27,6 +27,7 @@ class Mesh : public Dispatcher {
   RTCClock* _rtc;
   RNG* _rng;
   MeshTables* _tables;
+  uint32_t n_forwarded;   // packets actually re-transmitted (repeater/transport role)
 
   void removeSelfFromPath(Packet* packet);
   void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
@@ -177,6 +178,10 @@ public:
   void loop();
 
   LocalIdentity self_id;
+
+  // packets actually re-transmitted (vs. just permitted by allowPacketForward()) —
+  // confirms a repeater/transport role is really forwarding, not just configured to.
+  uint32_t getNumForwarded() const { return n_forwarded; }
 
   RNG* getRNG() const { return _rng; }
   RTCClock* getRTCClock() const { return _rtc; }
