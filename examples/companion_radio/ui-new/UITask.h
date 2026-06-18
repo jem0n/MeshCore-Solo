@@ -258,6 +258,7 @@ public:
   void applyTxPower();
   void applyPowerSave();   // hardware duty-cycle RX on/off from prefs
   void applyApc();         // Adaptive Power Control on/off from prefs
+  void applyRadioParams(); // freq/bw/sf/cr from prefs (radio preset change)
   void applyFont();
   void applyRotation();
   void applyFullRefreshInterval();

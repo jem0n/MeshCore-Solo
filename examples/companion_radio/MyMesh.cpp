@@ -521,8 +521,36 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* packet) {
   return false;
 }
 
+// Loop guard for flood packets, ported from simple_repeater's LOOP_DETECT_MODERATE
+// thresholds (max times this node's hash may already appear in the path, by hash size).
+// A companion moves around, so it re-enters its own flood's path more easily than a
+// fixed repeater — hardcoded rather than configurable since there's no CLI here.
+static const uint8_t REPEAT_LOOP_MAX[] = { 0, /*1-byte*/ 2, /*2-byte*/ 1, /*3-byte*/ 1 };
+// Caps how many hops an ADVERT flood gets repeated, matching simple_repeater's default
+// flood_max_advert — adverts are the most frequent flood traffic, so this is the one
+// depth limit worth keeping even without the rest of simple_repeater's flood_max knobs.
+static const uint8_t REPEAT_MAX_ADVERT_HOPS = 8;
+
+bool MyMesh::isRepeatLooped(const mesh::Packet* packet) const {
+  uint8_t hash_size = packet->getPathHashSize();
+  uint8_t hash_count = packet->getPathHashCount();
+  uint8_t n = 0;
+  const uint8_t* path = packet->path;
+  while (hash_count > 0) {
+    if (self_id.isHashMatch(path, hash_size)) n++;
+    hash_count--;
+    path += hash_size;
+  }
+  return n >= REPEAT_LOOP_MAX[hash_size];
+}
+
 bool MyMesh::allowPacketForward(const mesh::Packet* packet) {
-  return _prefs.client_repeat != 0;
+  if (_prefs.client_repeat == 0) return false;
+  if (packet->isRouteFlood()) {
+    if (packet->getPayloadType() == PAYLOAD_TYPE_ADVERT && packet->getPathHashCount() >= REPEAT_MAX_ADVERT_HOPS) return false;
+    if (isRepeatLooped(packet)) return false;
+  }
+  return true;
 }
 
 void MyMesh::sendFloodScoped(const TransportKey& scope, mesh::Packet* pkt, uint32_t delay_millis) {
@@ -1214,7 +1242,13 @@ void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
 }
 
 MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store, AbstractUITask* ui)
-    : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables),
+    // Sized to match simple_repeater's pool (32), not the old client-only 16: with the
+    // on-device Repeater toggle, queued retransmits (adverts/channel flood from
+    // neighbours) can now hold packet-pool slots for their retransmit delay window. A
+    // pool too small for that starves Dispatcher::checkRecv()'s allocNew(), which then
+    // silently drops every incoming packet — DMs and channels included — until a slot
+    // frees up.
+    : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(32), tables),
       _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store), _ui(ui) {
   _iter_started = false;
   _cli_rescue = false;

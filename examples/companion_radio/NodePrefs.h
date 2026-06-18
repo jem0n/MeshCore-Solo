@@ -140,11 +140,23 @@ struct NodePrefs {  // persisted to file
   // shows ✗. 0 = no auto-resend (single attempt). Default 2.
   uint8_t  dm_resend_count;
 
+  // User-saved radio presets (Settings > Radio > Preset > "Save current...").
+  // name[0] == '\0' marks an empty slot.
+  struct UserRadioPreset {
+    char name[16];
+    float freq;
+    float bw;
+    uint8_t sf;
+    uint8_t cr;
+  };
+  static const uint8_t USER_RADIO_PRESET_MAX = 4;
+  UserRadioPreset user_radio_presets[USER_RADIO_PRESET_MAX];
+
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE000C;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE000D;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage

@@ -331,6 +331,7 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   rd(&_prefs.bot_quiet_start,     sizeof(_prefs.bot_quiet_start));
   rd(&_prefs.bot_quiet_end,       sizeof(_prefs.bot_quiet_end));
   rd(_prefs.bot_trigger_ch,       sizeof(_prefs.bot_trigger_ch));
+  rd(_prefs.user_radio_presets,   sizeof(_prefs.user_radio_presets));
   // → 0xC0DE000B: append bot_commands_enabled + quiet-hours. Older files leave
   // stray bytes here; clamp so upgraders fall back to off / no quiet hours.
   if (_prefs.bot_commands_enabled > 1)  _prefs.bot_commands_enabled = 0;
@@ -385,6 +386,9 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
     // so an existing channel bot keeps reacting to the same word after upgrade.
     if (_prefs.bot_trigger_ch[0] == '\0')
       strncpy(_prefs.bot_trigger_ch, _prefs.bot_trigger, sizeof(_prefs.bot_trigger_ch) - 1);
+    // → 0xC0DE000D: append user_radio_presets. No clamping needed — rd() already
+    // zero-inits it on a pre-0x0D file, and name[0]=='\0' is exactly the "empty
+    // slot" sentinel the UI already expects.
   }
 
   file.close();
@@ -484,6 +488,7 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.bot_quiet_start,     sizeof(_prefs.bot_quiet_start));
     file.write((uint8_t *)&_prefs.bot_quiet_end,       sizeof(_prefs.bot_quiet_end));
     file.write((uint8_t *)_prefs.bot_trigger_ch,       sizeof(_prefs.bot_trigger_ch));
+    file.write((uint8_t *)_prefs.user_radio_presets,   sizeof(_prefs.user_radio_presets));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

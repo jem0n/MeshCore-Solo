@@ -2093,6 +2093,11 @@ void UITask::applyApc() {
   the_mesh.applyApc();   // (re)initialise Adaptive Power Control from prefs
 }
 
+void UITask::applyRadioParams() {
+  if (_node_prefs == NULL) return;
+  radio_driver.setParams(_node_prefs->freq, _node_prefs->bw, _node_prefs->sf, _node_prefs->cr);
+}
+
 void UITask::applyBrightness() {
   if (_display != NULL && _node_prefs != NULL) {
     _display->setBrightness(_node_prefs->display_brightness);
