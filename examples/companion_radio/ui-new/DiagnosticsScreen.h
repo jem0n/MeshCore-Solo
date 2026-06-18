@@ -4,6 +4,7 @@
 #include <helpers/DeviceDiag.h>
 #include <Arduino.h>
 #include "icons.h"
+#include "PopupMenu.h"
 #include "../MyMesh.h"
 
 extern MyMesh the_mesh;
@@ -18,6 +19,7 @@ extern MyMesh the_mesh;
 class DiagnosticsScreen : public UIScreen {
   UITask* _task;
   int _scroll = 0;
+  PopupMenu _reset_menu;   // Enter → confirm before zeroing the cumulative counters
 
   struct Row { const char* label; char value[20]; };
   static const int MAX_ROWS = 13;
@@ -128,13 +130,31 @@ public:
     }
     drawScrollIndicator(display, start_y, visible * item_h, _row_count, visible, _scroll);
     display.setColor(DisplayDriver::LIGHT);
-    return 1000;   // stats refresh once a second — no need for a faster redraw
+    if (_reset_menu.active) _reset_menu.render(display);
+    return _reset_menu.active ? 50 : 1000;   // popup wants snappier redraw; stats otherwise refresh once a second
   }
 
   bool handleInput(char c) override {
+    if (_reset_menu.active) {
+      auto res = _reset_menu.handleInput(c);
+      // Index 0 = "Reset", 1 = "Cancel" (destructive option first, but never the
+      // default landing row — see setSelected below).
+      if (res == PopupMenu::SELECTED && _reset_menu.selectedIndex() == 0) {
+        the_mesh.resetStats();   // zeroes Dispatcher per-type counters + Mesh forward count
+        _task->showAlert("Counters reset", 800);
+      }
+      return true;
+    }
     if (c == KEY_UP)   { if (_scroll > 0) _scroll--; return true; }
     if (c == KEY_DOWN) { _scroll++; return true; }   // clamped to max_scroll in render()
-    if (c == KEY_CANCEL || c == KEY_CONTEXT_MENU || c == KEY_ENTER) { _task->gotoToolsScreen(); return true; }
+    if (c == KEY_ENTER) {
+      _reset_menu.begin("Reset counters?", 2);
+      _reset_menu.addItem("Reset");
+      _reset_menu.addItem("Cancel");
+      _reset_menu.setSelected(1);   // default to Cancel so a stray Enter doesn't wipe stats
+      return true;
+    }
+    if (c == KEY_CANCEL || c == KEY_CONTEXT_MENU) { _task->gotoToolsScreen(); return true; }
     return false;
   }
 };

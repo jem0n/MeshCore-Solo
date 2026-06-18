@@ -183,6 +183,9 @@ public:
   // confirms a repeater/transport role is really forwarding, not just configured to.
   uint32_t getNumForwarded() const { return n_forwarded; }
 
+  // also clear the forward counter alongside the Dispatcher packet counters.
+  void resetStats() override { Dispatcher::resetStats(); n_forwarded = 0; }
+
   RNG* getRNG() const { return _rng; }
   RTCClock* getRTCClock() const { return _rtc; }
 

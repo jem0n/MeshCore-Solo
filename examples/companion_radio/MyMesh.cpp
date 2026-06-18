@@ -525,7 +525,11 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* packet) {
 // thresholds (max times this node's hash may already appear in the path, by hash size).
 // A companion moves around, so it re-enters its own flood's path more easily than a
 // fixed repeater — hardcoded rather than configurable since there's no CLI here.
-static const uint8_t REPEAT_LOOP_MAX[] = { 0, /*1-byte*/ 2, /*2-byte*/ 1, /*3-byte*/ 1 };
+// Indexed by getPathHashSize() = (path_len>>6)+1, so 1..4. Index 0 is unused
+// (hash size is never 0); index 4 covers path_mode 3, which tryParsePacket
+// currently rejects — kept in-bounds so this can't OOB-read if that guard is
+// ever relaxed.
+static const uint8_t REPEAT_LOOP_MAX[] = { 0, /*1-byte*/ 2, /*2-byte*/ 1, /*3-byte*/ 1, /*4-byte*/ 1 };
 // Caps how many hops an ADVERT flood gets repeated, matching simple_repeater's default
 // flood_max_advert — adverts are the most frequent flood traffic, so this is the one
 // depth limit worth keeping even without the rest of simple_repeater's flood_max knobs.
@@ -533,6 +537,7 @@ static const uint8_t REPEAT_MAX_ADVERT_HOPS = 8;
 
 bool MyMesh::isRepeatLooped(const mesh::Packet* packet) const {
   uint8_t hash_size = packet->getPathHashSize();
+  if (hash_size >= sizeof(REPEAT_LOOP_MAX)) return true;  // unknown hash size: treat as looped, don't forward
   uint8_t hash_count = packet->getPathHashCount();
   uint8_t n = 0;
   const uint8_t* path = packet->path;
