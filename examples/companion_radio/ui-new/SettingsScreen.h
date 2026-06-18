@@ -63,6 +63,7 @@ class SettingsScreen : public UIScreen {
     RPT_MAX_HOPS,
     RPT_DELAY,
     RPT_MIN_SNR,
+    RPT_SUPPRESS,
     POWER_SAVE,
     TX_APC,
     // System section
@@ -290,7 +291,8 @@ class SettingsScreen : public UIScreen {
   }
 
   bool isRepeaterSubItem(int item) const {
-    return item == RPT_SKIP_ADV || item == RPT_MAX_HOPS || item == RPT_DELAY || item == RPT_MIN_SNR;
+    return item == RPT_SKIP_ADV || item == RPT_MAX_HOPS || item == RPT_DELAY
+        || item == RPT_MIN_SNR || item == RPT_SUPPRESS;
   }
 
   bool isHomePage(int item) const {
@@ -648,6 +650,10 @@ class SettingsScreen : public UIScreen {
       else strcpy(buf, "Off");
       display.setCursor(valCol(display), y);
       display.print(buf);
+    } else if (item == RPT_SUPPRESS) {
+      display.print(" Suppress dup");
+      display.setCursor(valCol(display), y);
+      display.print((p && p->repeat_suppress_dup) ? "ON" : "OFF");
     } else if (item == POWER_SAVE) {
       display.print("Pwr save");
       display.setCursor(valCol(display), y);
@@ -1072,6 +1078,11 @@ public:
           p->repeat_min_snr = (v <= -20) ? NodePrefs::REPEAT_SNR_DISABLED : (int8_t)(v - 1);
         _dirty = true; return true;
       }
+    }
+    if (_selected == RPT_SUPPRESS && p && (left || right || enter)) {
+      p->repeat_suppress_dup ^= 1;
+      _dirty = true;
+      return true;
     }
     if (_selected == POWER_SAVE && p && (left || right || enter)) {
       p->rx_powersave ^= 1;

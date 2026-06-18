@@ -343,12 +343,14 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   rd(&_prefs.repeat_max_hops,     sizeof(_prefs.repeat_max_hops));
   rd(&_prefs.repeat_delay_boost,  sizeof(_prefs.repeat_delay_boost));
   rd(&_prefs.repeat_min_snr,      sizeof(_prefs.repeat_min_snr));
+  rd(&_prefs.repeat_suppress_dup, sizeof(_prefs.repeat_suppress_dup));
   if (_prefs.repeat_skip_adverts > 1) _prefs.repeat_skip_adverts = 0;
   if (_prefs.repeat_max_hops > 64)    _prefs.repeat_max_hops = 0;
   if (_prefs.repeat_delay_boost > 8)  _prefs.repeat_delay_boost = 0;
   if (_prefs.repeat_min_snr != NodePrefs::REPEAT_SNR_DISABLED &&
       (_prefs.repeat_min_snr < -30 || _prefs.repeat_min_snr > 20))
     _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;
+  if (_prefs.repeat_suppress_dup > 1) _prefs.repeat_suppress_dup = 0;
   // → 0xC0DE000B: append bot_commands_enabled + quiet-hours. Older files leave
   // stray bytes here; clamp so upgraders fall back to off / no quiet hours.
   if (_prefs.bot_commands_enabled > 1)  _prefs.bot_commands_enabled = 0;
@@ -510,6 +512,7 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.repeat_max_hops,      sizeof(_prefs.repeat_max_hops));
     file.write((uint8_t *)&_prefs.repeat_delay_boost,   sizeof(_prefs.repeat_delay_boost));
     file.write((uint8_t *)&_prefs.repeat_min_snr,       sizeof(_prefs.repeat_min_snr));
+    file.write((uint8_t *)&_prefs.repeat_suppress_dup,  sizeof(_prefs.repeat_suppress_dup));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

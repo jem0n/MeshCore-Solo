@@ -170,6 +170,14 @@ protected:
   virtual int getAGCResetInterval() const { return 0; }    // disabled by default
   virtual unsigned long getDutyCycleWindowMs() const { return 3600000; }
 
+  // When true, a received flood packet whose hash matches one still waiting in
+  // the outbound queue cancels that queued retransmit (overhear suppression):
+  // another node already relayed it, so this node stays quiet. Default off.
+  virtual bool wantsOverhearSuppress() const { return false; }
+  // Hook fired when such a queued retransmit is cancelled — lets a sub-class
+  // keep its forward counter honest. Default no-op.
+  virtual void onRetransmitCancelled(Packet* packet) { }
+
 public:
   void begin();
   void loop();
@@ -205,6 +213,7 @@ public:
 private:
   void checkRecv();
   void checkSend();
+  void suppressQueuedDuplicate(Packet* pkt);   // overhear cancel (see wantsOverhearSuppress)
 };
 
 }

@@ -56,6 +56,10 @@ protected:
    */
   virtual bool allowPacketForward(const Packet* packet);
 
+  // Keep the forward counter honest when an overhear cancels a queued retransmit:
+  // the packet was counted at the ACTION_RETRANSMIT decision, so back it out here.
+  void onRetransmitCancelled(Packet* packet) override { if (n_forwarded) n_forwarded--; }
+
   /**
    * \returns  number of milliseconds delay to apply to retransmitting the given packet.
    */

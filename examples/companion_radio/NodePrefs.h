@@ -164,17 +164,20 @@ struct NodePrefs {  // persisted to file
   //    fixed repeaters. Effective delay = base * (1 + repeat_delay_boost). 0 = off.
   //  repeat_min_snr: drop a flood packet received below this SNR (dB), so marginal
   //    fringe traffic isn't re-flooded. REPEAT_SNR_DISABLED (-128) = off.
+  //  repeat_suppress_dup: 1 = cancel a queued retransmit when the same flood is
+  //    overheard from another node first (less redundant airtime in dense mesh).
   uint8_t  repeat_skip_adverts;
   uint8_t  repeat_max_hops;
   uint8_t  repeat_delay_boost;
   int8_t   repeat_min_snr;
   static const int8_t REPEAT_SNR_DISABLED = -128;
+  uint8_t  repeat_suppress_dup;
 
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE000E;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE000F;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage
