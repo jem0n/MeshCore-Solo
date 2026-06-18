@@ -210,6 +210,10 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
 #ifdef DISPLAY_ROTATION
   _prefs.display_rotation = DISPLAY_ROTATION;
 #endif
+  // 0 is a valid SNR threshold, so the "off" state needs its own sentinel set
+  // before reading — an older file lacking this field must read as disabled,
+  // not as "filter everything below 0 dB".
+  _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;
   File file = openRead(_fs, filename);
   if (!file) return;
 
@@ -332,6 +336,19 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   rd(&_prefs.bot_quiet_end,       sizeof(_prefs.bot_quiet_end));
   rd(_prefs.bot_trigger_ch,       sizeof(_prefs.bot_trigger_ch));
   rd(_prefs.user_radio_presets,   sizeof(_prefs.user_radio_presets));
+  // → 0xC0DE000E: repeater politeness knobs. On a pre-E file the bytes here are
+  // that file's own sentinel tail, so clamp every out-of-range value back to its
+  // "off" default (same stray-byte handling as the fields below).
+  rd(&_prefs.repeat_skip_adverts, sizeof(_prefs.repeat_skip_adverts));
+  rd(&_prefs.repeat_max_hops,     sizeof(_prefs.repeat_max_hops));
+  rd(&_prefs.repeat_delay_boost,  sizeof(_prefs.repeat_delay_boost));
+  rd(&_prefs.repeat_min_snr,      sizeof(_prefs.repeat_min_snr));
+  if (_prefs.repeat_skip_adverts > 1) _prefs.repeat_skip_adverts = 0;
+  if (_prefs.repeat_max_hops > 64)    _prefs.repeat_max_hops = 0;
+  if (_prefs.repeat_delay_boost > 8)  _prefs.repeat_delay_boost = 0;
+  if (_prefs.repeat_min_snr != NodePrefs::REPEAT_SNR_DISABLED &&
+      (_prefs.repeat_min_snr < -30 || _prefs.repeat_min_snr > 20))
+    _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;
   // → 0xC0DE000B: append bot_commands_enabled + quiet-hours. Older files leave
   // stray bytes here; clamp so upgraders fall back to off / no quiet hours.
   if (_prefs.bot_commands_enabled > 1)  _prefs.bot_commands_enabled = 0;
@@ -489,6 +506,10 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.bot_quiet_end,       sizeof(_prefs.bot_quiet_end));
     file.write((uint8_t *)_prefs.bot_trigger_ch,       sizeof(_prefs.bot_trigger_ch));
     file.write((uint8_t *)_prefs.user_radio_presets,   sizeof(_prefs.user_radio_presets));
+    file.write((uint8_t *)&_prefs.repeat_skip_adverts,  sizeof(_prefs.repeat_skip_adverts));
+    file.write((uint8_t *)&_prefs.repeat_max_hops,      sizeof(_prefs.repeat_max_hops));
+    file.write((uint8_t *)&_prefs.repeat_delay_boost,   sizeof(_prefs.repeat_delay_boost));
+    file.write((uint8_t *)&_prefs.repeat_min_snr,       sizeof(_prefs.repeat_min_snr));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

@@ -282,7 +282,12 @@ int MyMesh::calcRxDelay(float score, uint32_t air_time) const {
 
 uint32_t MyMesh::getRetransmitDelay(const mesh::Packet *packet) {
   uint32_t t = (_radio->getEstAirtimeFor(packet->getPathByteLen() + packet->payload_len + 2) * 0.5f);
-  return getRNG()->nextInt(0, 5*t + 1);
+  uint32_t d = getRNG()->nextInt(0, 5*t + 1);
+  // Politeness yield (Settings > Radio): scale the flood retransmit delay so a
+  // mobile companion waits longer and lets better-sited fixed repeaters win the
+  // flood first. Only forwarded floods reach here — own sends pass their own
+  // delay to sendFlood() — so this never slows the companion's own traffic.
+  return d * (1 + _prefs.repeat_delay_boost);
 }
 uint32_t MyMesh::getDirectRetransmitDelay(const mesh::Packet *packet) {
   uint32_t t = (_radio->getEstAirtimeFor(packet->getPathByteLen() + packet->payload_len + 2) * 0.2f);
@@ -551,7 +556,15 @@ bool MyMesh::isRepeatLooped(const mesh::Packet* packet) const {
 
 bool MyMesh::allowPacketForward(const mesh::Packet* packet) {
   if (_prefs.client_repeat == 0) return false;
+  // "Politeness" filters (Settings > Radio) — all default off, so a plain repeater
+  // is unaffected. Flood-only by design: on a direct route this node is the named
+  // next hop, so dropping there would kill delivery with no alternate path, while
+  // dropping a flood copy just trims redundancy other nodes still carry.
   if (packet->isRouteFlood()) {
+    if (_prefs.repeat_min_snr != NodePrefs::REPEAT_SNR_DISABLED
+        && packet->getSNR() < (float)_prefs.repeat_min_snr) return false;
+    if (_prefs.repeat_skip_adverts && packet->getPayloadType() == PAYLOAD_TYPE_ADVERT) return false;
+    if (_prefs.repeat_max_hops > 0 && packet->getPathHashCount() >= _prefs.repeat_max_hops) return false;
     if (packet->getPayloadType() == PAYLOAD_TYPE_ADVERT && packet->getPathHashCount() >= REPEAT_MAX_ADVERT_HOPS) return false;
     if (isRepeatLooped(packet)) return false;
   }

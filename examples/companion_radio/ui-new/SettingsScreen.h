@@ -59,6 +59,10 @@ class SettingsScreen : public UIScreen {
     RADIO_PRESET,
     CUSTOM_FREQ, CUSTOM_SF, CUSTOM_BW, CUSTOM_CR,
     REPEATER,
+    RPT_SKIP_ADV,   // repeater politeness sub-items, only shown when REPEATER is on
+    RPT_MAX_HOPS,
+    RPT_DELAY,
+    RPT_MIN_SNR,
     POWER_SAVE,
     TX_APC,
     // System section
@@ -274,9 +278,19 @@ class SettingsScreen : public UIScreen {
         cur_collapsed = (_collapsed >> cur_sec) & 1;
         if (_vis_count < MAX_VIS) _vis[_vis_count++] = (uint8_t)i;
       } else if (!cur_collapsed && _vis_count < MAX_VIS) {
+        // Repeater politeness knobs are meaningless when the repeater is off, so
+        // hide them until it's enabled — keeps the Radio section short by default.
+        if (isRepeaterSubItem(i)) {
+          NodePrefs* p = _task->getNodePrefs();
+          if (!p || !p->client_repeat) continue;
+        }
         _vis[_vis_count++] = (uint8_t)i;
       }
     }
+  }
+
+  bool isRepeaterSubItem(int item) const {
+    return item == RPT_SKIP_ADV || item == RPT_MAX_HOPS || item == RPT_DELAY || item == RPT_MIN_SNR;
   }
 
   bool isHomePage(int item) const {
@@ -609,6 +623,31 @@ class SettingsScreen : public UIScreen {
       display.print("Repeater");
       display.setCursor(valCol(display), y);
       display.print((p && p->client_repeat) ? "ON" : "OFF");
+    } else if (item == RPT_SKIP_ADV) {
+      display.print(" Skip advert");
+      display.setCursor(valCol(display), y);
+      display.print((p && p->repeat_skip_adverts) ? "ON" : "OFF");
+    } else if (item == RPT_MAX_HOPS) {
+      display.print(" Max hops");
+      char buf[6];
+      if (p && p->repeat_max_hops > 0) snprintf(buf, sizeof(buf), "%d", (int)p->repeat_max_hops);
+      else strcpy(buf, "Off");
+      display.setCursor(valCol(display), y);
+      display.print(buf);
+    } else if (item == RPT_DELAY) {
+      display.print(" Yield");
+      char buf[6];
+      if (p && p->repeat_delay_boost > 0) snprintf(buf, sizeof(buf), "x%d", (int)p->repeat_delay_boost + 1);
+      else strcpy(buf, "Off");
+      display.setCursor(valCol(display), y);
+      display.print(buf);
+    } else if (item == RPT_MIN_SNR) {
+      display.print(" Min SNR");
+      char buf[8];
+      if (p && p->repeat_min_snr != NodePrefs::REPEAT_SNR_DISABLED) snprintf(buf, sizeof(buf), "%ddB", (int)p->repeat_min_snr);
+      else strcpy(buf, "Off");
+      display.setCursor(valCol(display), y);
+      display.print(buf);
     } else if (item == POWER_SAVE) {
       display.print("Pwr save");
       display.setCursor(valCol(display), y);
@@ -1004,8 +1043,35 @@ public:
     }
     if (_selected == REPEATER && p && (left || right || enter)) {
       p->client_repeat = p->client_repeat ? 0 : 1;
+      buildVis();   // show/hide the politeness sub-items immediately
       _dirty = true;
       return true;
+    }
+    if (_selected == RPT_SKIP_ADV && p && (left || right || enter)) {
+      p->repeat_skip_adverts ^= 1;
+      _dirty = true;
+      return true;
+    }
+    if (_selected == RPT_MAX_HOPS && p) {
+      if (right && p->repeat_max_hops < 8) { p->repeat_max_hops++; _dirty = true; return true; }
+      if (left  && p->repeat_max_hops > 0) { p->repeat_max_hops--; _dirty = true; return true; }
+    }
+    if (_selected == RPT_DELAY && p) {
+      if (right && p->repeat_delay_boost < 8) { p->repeat_delay_boost++; _dirty = true; return true; }
+      if (left  && p->repeat_delay_boost > 0) { p->repeat_delay_boost--; _dirty = true; return true; }
+    }
+    if (_selected == RPT_MIN_SNR && p) {
+      // Steps -20..10 dB; stepping left past the floor turns the filter off.
+      int8_t v = p->repeat_min_snr;
+      if (right) {
+        v = (v == NodePrefs::REPEAT_SNR_DISABLED) ? -20 : (v < 10 ? v + 1 : 10);
+        p->repeat_min_snr = v; _dirty = true; return true;
+      }
+      if (left) {
+        if (v != NodePrefs::REPEAT_SNR_DISABLED)
+          p->repeat_min_snr = (v <= -20) ? NodePrefs::REPEAT_SNR_DISABLED : (int8_t)(v - 1);
+        _dirty = true; return true;
+      }
     }
     if (_selected == POWER_SAVE && p && (left || right || enter)) {
       p->rx_powersave ^= 1;
