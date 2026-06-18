@@ -4,6 +4,7 @@
 
 #include "../Features.h"
 #include "../RadioPresets.h"
+#include "DigitEditor.h"
 
 class SettingsScreen : public UIScreen {
   UITask* _task;
@@ -577,10 +578,15 @@ class SettingsScreen : public UIScreen {
       display.drawTextEllipsized(xc, y, display.width() - xc - _reserve, name);
     } else if (item == CUSTOM_FREQ) {
       display.print("Freq");
-      char buf[10];
-      snprintf(buf, sizeof(buf), "%.3f", p ? p->freq : 0.0f);
-      display.setCursor(valCol(display), y);
-      display.print(buf);
+      int xc = valCol(display);
+      if (sel && _freq_editor.active) {
+        _freq_editor.render(display, xc, y);
+      } else {
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%.3f", p ? p->freq : 0.0f);
+        display.setCursor(xc, y);
+        display.print(buf);
+      }
     } else if (item == CUSTOM_SF) {
       display.print("SF");
       char buf[6];
@@ -719,6 +725,10 @@ class SettingsScreen : public UIScreen {
   bool    _preset_saving = false;   // _kb is open to name a new preset, not a msg slot
   bool    _preset_deleting = false; // _preset_menu is showing the delete sub-list
 
+  // Digit-by-digit Freq editor (see DigitEditor.h) — only this field uses it;
+  // SF/BW/CR are small discrete sets where a plain left/right cycle is fine.
+  DigitEditor _freq_editor;
+
   // Layout: [0]="+ Save current...", [1..RADIO_PRESET_COUNT]=built-ins,
   // [..+_preset_user_count]=saved user presets, ["- Delete preset..." if any].
   void openPresetMenu() {
@@ -764,6 +774,7 @@ public:
     _selected = SECTION_DISPLAY;
     buildVis();
     _scroll = 0;
+    _freq_editor.active = false;
   }
 
   int render(DisplayDriver& display) override {
@@ -806,6 +817,18 @@ public:
         _edit_slot = -1;
       } else if (res == KeyboardWidget::CANCELLED) {
         _edit_slot = -1;
+      }
+      return true;
+    }
+
+    // Digit-by-digit Freq editor
+    if (_freq_editor.active) {
+      float before = _freq_editor.value;
+      _freq_editor.handleInput(c);
+      if (p && _freq_editor.value != before) {
+        p->freq = _freq_editor.value;
+        _task->applyRadioParams();
+        _dirty = true;
       }
       return true;
     }
@@ -957,14 +980,14 @@ public:
       openPresetMenu();
       return true;
     }
-    // Manual fine-tune of the active radio params. Freq bounds come from the
-    // radio driver itself (RadioLib's own validated range for this chip) so the
-    // field can never be nudged to a value setFrequency() would silently reject.
-    if (_selected == CUSTOM_FREQ && p) {
+    // Enter Freq's digit-by-digit editor (see DigitEditor.h). Bounds come from
+    // the radio driver itself (RadioLib's own validated range for this chip)
+    // so a digit can never be nudged to a value setFrequency() would reject.
+    if (_selected == CUSTOM_FREQ && p && enter) {
       float min_mhz, max_mhz;
       radio_driver.getFreqBounds(min_mhz, max_mhz);
-      if (right && p->freq < max_mhz) { p->freq += 0.025f; _task->applyRadioParams(); _dirty = true; return true; }
-      if (left  && p->freq > min_mhz) { p->freq -= 0.025f; _task->applyRadioParams(); _dirty = true; return true; }
+      _freq_editor.begin(p->freq, min_mhz, max_mhz, 3, 3);  // SX1262 range fits 3 integer digits; 3 decimals = kHz
+      return true;
     }
     if (_selected == CUSTOM_SF && p) {
       if (right && p->sf < 12) { p->sf++; _task->applyRadioParams(); _dirty = true; return true; }
