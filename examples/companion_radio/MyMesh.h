@@ -41,18 +41,7 @@ class UITask;
 
 /* ---------------------------------- CONFIGURATION ------------------------------------- */
 
-#ifndef LORA_FREQ
-#define LORA_FREQ 915.0
-#endif
-#ifndef LORA_BW
-#define LORA_BW 250
-#endif
-#ifndef LORA_SF
-#define LORA_SF 10
-#endif
-#ifndef LORA_CR
-#define LORA_CR 5
-#endif
+// LORA_FREQ/BW/SF/CR fallbacks now live in NodePrefs.h (DataStore.cpp needs them too).
 #ifndef LORA_TX_POWER
 #define LORA_TX_POWER 20
 #endif

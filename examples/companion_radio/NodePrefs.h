@@ -2,6 +2,37 @@
 #include <cstdint>
 #include <stdio.h>
 
+// Firmware's own boot-default radio params — used both as the companion's
+// initial freq/sf/bw/cr (MyMesh.cpp) and, here, as the seed for a never-
+// configured repeater profile (DataStore.cpp). Kept above any per-board
+// target.h include so a board can still override via -D before this file
+// is reached.
+#ifndef LORA_FREQ
+#define LORA_FREQ 915.0
+#endif
+#ifndef LORA_BW
+#define LORA_BW 250
+#endif
+#ifndef LORA_SF
+#define LORA_SF 10
+#endif
+#ifndef LORA_CR
+#define LORA_CR 5
+#endif
+
+// Bucket a companion frequency into whichever of the three license-exempt
+// bands MeshCore's app-driven repeat toggle historically restricted to (see
+// repeat_freq_ranges in MyMesh.cpp: 433.000 / 869.495 / 918.000 MHz). Used to
+// seed a never-configured repeater profile in the same legal band as the
+// companion's own network (MyMesh.cpp begin(), DataStore.cpp) — a flat
+// single frequency could land outside the bands allowed where the operator
+// actually lives.
+static inline float defaultRepeaterFreqForBand(float companion_freq) {
+  if (companion_freq < 500.0f) return 433.000f;
+  if (companion_freq < 890.0f) return 869.495f;
+  return 918.000f;
+}
+
 #define TELEM_MODE_DENY            0
 #define TELEM_MODE_ALLOW_FLAGS     1     // use contact.flags
 #define TELEM_MODE_ALLOW_ALL       2
@@ -176,7 +207,11 @@ struct NodePrefs {  // persisted to file
   // Optional dedicated radio profile for repeater mode. When repeater_use_profile
   // is 1, enabling the repeater switches the radio to repeater_freq/bw/sf/cr and
   // disabling restores the companion's freq/bw/sf/cr (the fields above). 0 = the
-  // repeater stays on the current companion frequency (default — no switch).
+  // repeater stays on the current companion frequency. Default (a never-configured
+  // device) is 1, seeded via defaultRepeaterFreqForBand(freq) + LORA_SF/BW/CR —
+  // repeating on whatever private network the companion later joins isn't the
+  // community norm, and the seed stays in the same legal band as the companion's
+  // own network rather than a flat frequency.
   uint8_t  repeater_use_profile;
   float    repeater_freq;
   float    repeater_bw;

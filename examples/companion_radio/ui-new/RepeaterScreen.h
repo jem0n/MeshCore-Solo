@@ -6,10 +6,14 @@
 // and keeps the relaying controls next to the numbers that show them working.
 //
 // Network modes:
-//  - Current  — repeat on the companion's current frequency (default).
+//  - Current  — repeat on the companion's current frequency. Opt-in only:
+//               relaying on whatever network the operator is chatting on
+//               isn't the MeshCore community norm.
 //  - Custom   — enabling the repeater switches the radio to a dedicated profile
 //               (preset or manual), and disabling restores the companion params.
-//               Set the profile equal to the companion's for "same network".
+//               Default for a never-configured device, seeded with a frequency
+//               in the same band as the companion's own network (so the default
+//               can't land outside what's legal for the operator's region).
 // Included by UITask.cpp.
 
 #include <helpers/ui/DisplayDriver.h>

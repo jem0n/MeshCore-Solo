@@ -1307,6 +1307,14 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   _prefs.bw = LORA_BW;
   _prefs.cr = LORA_CR;
   _prefs.tx_power_dbm = LORA_TX_POWER;
+  // Repeater profile default for a true first boot (no prefs file yet, so
+  // loadPrefs() below is a no-op) — same band-matched seed as the upgrade
+  // path in DataStore.cpp, kept in sync rather than left at memset's 0/Current.
+  _prefs.repeater_use_profile = 1;
+  _prefs.repeater_freq = defaultRepeaterFreqForBand(_prefs.freq);
+  _prefs.repeater_bw   = LORA_BW;
+  _prefs.repeater_sf   = LORA_SF;
+  _prefs.repeater_cr   = LORA_CR;
   _prefs.gps_enabled = 0;       // GPS disabled by default
   _prefs.gps_interval = 0;      // No automatic GPS updates by default
   _prefs.display_brightness = 2; // medium brightness by default

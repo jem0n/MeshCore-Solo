@@ -447,8 +447,10 @@ On-device repeater for the Solo companion, scoped to the SX1262 boards (Wio
 Tracker L1 OLED/e-ink, GAT562 30S). All on `feature/companion-repeater-presets`.
 
 - **Repeater toggle** (`client_repeat`, Tools › Repeater) — the companion relays
-  flood/direct traffic on its **current** frequency (no dedicated band), still
-  working as a normal companion. `MyMesh::allowPacketForward` gates it; loop
+  flood/direct traffic, still working as a normal companion. By default it
+  switches to a dedicated band on enable (see profile note below) rather than
+  relaying on whatever network it's chatting on. `MyMesh::allowPacketForward`
+  gates it; loop
   detection (`isRepeatLooped`, ported from `simple_repeater`) and an advert
   flood-depth cap are always applied. Packet pool bumped 16→32 to match the
   repeater workload (a too-small pool starved channel/DM reception once relaying
@@ -464,8 +466,18 @@ Tracker L1 OLED/e-ink, GAT562 30S). All on `feature/companion-repeater-presets`.
   equal to the companion = "same network", a different one = drop onto a separate
   repeater network. `MyMesh::applyRepeaterRadio()` is the single decision point,
   called at boot and on every toggle/edit; `repeaterProfileValid()` gates it.
-  Schema sentinel `0xC0DE0010`, profile cleared to off if load finds an invalid
-  config (stray bytes from older files).
+  Schema sentinel `0xC0DE0010`. **Custom is the default**: a never-configured
+  device (or one upgrading from a pre-`0x10` file, which has no saved profile)
+  turns the profile on and seeds `repeater_sf/bw/cr` from `LORA_SF/BW/CR` plus
+  a band-matched `repeater_freq` — relaying on the same network the operator is
+  chatting on isn't the MeshCore community norm, so "Current" stays opt-in.
+  `defaultRepeaterFreqForBand()` (`NodePrefs.h`) buckets the companion's own
+  `freq` into whichever of the three license-exempt bands MeshCore's app-driven
+  repeat toggle historically restricted to (433.000 / 869.495 / 918.000 MHz —
+  see `repeat_freq_ranges` in `MyMesh.cpp`), so the seeded default can't land
+  outside what's legal for wherever the companion's own network already is.
+  `LORA_FREQ/BW/SF/CR` fallback `#define`s moved from `MyMesh.h` to
+  `NodePrefs.h` so `DataStore.cpp`'s migration code can see them too.
 - **Politeness knobs** (all opt-in, default off, flood-only — a direct route's
   named next hop is never dropped). Shown only while the repeater is on:
   - **Skip advert** — don't re-flood adverts (highest-volume flood).
