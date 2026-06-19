@@ -65,9 +65,28 @@ Lists all available home screen pages. For each entry:
 
 | Setting   | Options    | Notes                                                                                                                                                              |
 | --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TX power  | 2–22 dBm   | LEFT/RIGHT. With **Auto pwr** on this is the *ceiling* — the radio may transmit lower. |
+| TX Pwr    | 2–22 dBm   | LEFT/RIGHT. With **Auto pwr** on this is the *ceiling* — the radio may transmit lower. |
+| Preset    | named presets | LEFT/RIGHT cycles community RF presets (region frequency + bandwidth/SF/CR). **Enter** opens a popup to pick one, save the current settings as a named preset, or delete a saved one. Applies frequency, bandwidth, SF and CR together. |
+| Freq      | chip range | **Enter** opens a digit-by-digit editor: LEFT/RIGHT moves between decimal places, UP/DOWN steps that digit. Bounds come from the radio chip's own validated range, so a value the radio would reject can't be entered. |
+| SF        | 5–12       | LEFT/RIGHT. Spreading factor. |
+| BW        | 7.8–500 kHz | LEFT/RIGHT cycles the standard LoRa bandwidths. |
+| CR        | 5–8        | LEFT/RIGHT. Coding rate (4/5–4/8). |
+| Repeater  | ON / OFF   | When ON the companion also relays mesh traffic on its **current** frequency (no dedicated band needed), while still working as a normal companion. Loop-detection and flood-depth limits are always applied. Forwarding activity is visible in **Tools › Diagnostics**. |
+
+When **Repeater** is ON, five optional "politeness" sub-items appear below it (all default OFF, so a plain repeater is unaffected). They only filter **flood** traffic — on a direct route this node is the named next hop, so it never drops those.
+
+| Setting        | Options       | Notes                                                                                                          |
+| -------------- | ------------- | -------------------------------------------------------------------------------------------------------------- |
+| Skip advert    | ON / OFF      | Don't re-flood **advert** packets (the highest-volume flood traffic); messages and acks still relay.           |
+| Max hops       | Off / 1–8     | Drop a flood packet once it has already travelled this many hops.                                              |
+| Yield          | Off / x2–x9   | Scales the retransmit delay for **forwarded** floods only (own sends are unaffected), so a mobile companion defers to better-sited fixed repeaters. Widens the window for **Suppress dup**. |
+| Min SNR        | Off / −20…10 dB | Drop a flood copy received below this signal-to-noise threshold, so marginal fringe traffic isn't re-flooded.  |
+| Suppress dup   | ON / OFF      | If the same flood packet is overheard from another node while still queued to retransmit, cancel our copy — a peer already relayed it. Cuts redundant airtime in dense meshes; pairs with **Yield**. |
+
+| Setting   | Options    | Notes                                                                                                                                                              |
+| --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Pwr save  | ON / OFF   | **Battery saver.** Hardware duty-cycle receive: the SX126x cycles RX↔sleep on its own and wakes on a preamble, cutting average RX current. Trades a little receive latency; leave OFF for lowest-latency reception. Requires an SX126x radio (otherwise stays on continuous RX). |
-| Auto pwr  | ON / OFF   | **Adaptive Power Control.** Lowers actual TX power on strong links to save energy, ramping back up — to the **TX power** ceiling — on weak or lost links. Link quality comes from direct-message ACK SNR and, for channel messages (no ACK), from hearing a repeater rebroadcast your packet. The radio page / name bar shows the live power. Default OFF (fixed TX power). |
+| Auto pwr  | ON / OFF   | **Adaptive Power Control.** Lowers actual TX power on strong links to save energy, ramping back up — to the **TX Pwr** ceiling — on weak or lost links. Link quality comes from direct-message ACK SNR and, for channel messages (no ACK), from hearing a repeater rebroadcast your packet. The radio page / name bar shows the live power. Default OFF (fixed TX power). |
 
 ---
 

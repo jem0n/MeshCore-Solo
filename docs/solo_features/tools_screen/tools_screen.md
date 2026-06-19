@@ -8,7 +8,7 @@
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
 
-The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, and auto-advert. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
+The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, compass, and device diagnostics. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
 
 ---
 
@@ -287,3 +287,29 @@ With **Commands** ON, a DM beginning with `!` is answered with live node data, i
 Several commands can be combined in one message — `!batt !time !hops` is answered with a single `4.10V | 14:30 | 3 hops` reply (one transmission). A message with no recognised command falls through to the trigger bot.
 
 Commands also work on the **monitored channel** (the one selected for channel mode) — anyone there can query the node. Channel replies are broadcast to everyone, so unlike DM commands they respect quiet hours and use the shared per-channel cooldown. DM commands use the per-contact throttle.
+
+---
+
+## Diagnostics
+
+A single read-only screen of live device and mesh stats, refreshed once a second. On a small OLED the rows scroll with **UP/DOWN**; on a larger e-ink display they all fit at once.
+
+| Row          | Shows                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| Uptime       | Time since boot (`d hh:mm:ss`)                                                                      |
+| Total rx/tx  | All received / transmitted packets, summed across the categories below                             |
+| Msg          | Text and group-text packets, `rx/tx`                                                                |
+| Advert       | Advert packets, `rx/tx`                                                                             |
+| Ack/Path     | Ack, path-return and trace packets, `rx/tx`                                                         |
+| Other        | Everything else (requests, responses, control, raw, …), `rx/tx`                                    |
+| Forwarded    | Packets this node actually re-transmitted as a repeater (reflects overhear suppression, if on)     |
+| Heap free    | Free / total heap                                                                                  |
+| Stack free   | Current task's minimum-ever stack headroom                                                          |
+| Noise floor  | Live radio noise floor (dBm)                                                                        |
+| RSSI/SNR     | Signal strength / signal-to-noise of the last received packet                                      |
+| Pool free    | Free entries in the packet pool                                                                     |
+| Queue        | Packets waiting in the outbound queue                                                               |
+
+The packet counters and **Forwarded** are cumulative since boot. Press **Enter** to open a confirm popup that resets them (defaults to *Cancel*); the live readings (noise, RSSI/SNR, pool, queue, uptime) are not affected. **Cancel/Back** returns to the Tools list.
+
+The counters make the repeater behaviour observable: **Forwarded** confirms the node is actually relaying (not just configured to), and **Pool free** / **Queue** show whether forwarding is exhausting the packet pool. See **Settings › Radio › Repeater** for the relaying options.
