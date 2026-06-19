@@ -542,7 +542,11 @@ public:
       display.translateUTF8ToBlocks(filtered_name, _node_prefs->node_name, sizeof(filtered_name));
       int rightEdge = renderBatteryIndicator(display, _task->getBattMilliVolts());
       display.setColor(DisplayDriver::LIGHT);
-      if (_node_prefs && _node_prefs->tx_apc) {
+      // Only show the live-power readout when APC is actually controlling power —
+      // not merely when the pref is set. While repeating APC is suppressed and
+      // power is pinned to the ceiling, so apcActive() is false and the name bar
+      // drops the readout (matching the "--" lock in Settings).
+      if (the_mesh.apcActive()) {
         char pwr_buf[8];
         snprintf(pwr_buf, sizeof(pwr_buf), "%ddB", (int)radio_driver.getTxPower());
         int pwr_w = display.getTextWidth(pwr_buf);
