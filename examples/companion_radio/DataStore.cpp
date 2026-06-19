@@ -348,8 +348,8 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   if (_prefs.repeat_max_hops > 64)    _prefs.repeat_max_hops = 0;
   if (_prefs.repeat_delay_boost > 8)  _prefs.repeat_delay_boost = 0;
   if (_prefs.repeat_min_snr != NodePrefs::REPEAT_SNR_DISABLED &&
-      (_prefs.repeat_min_snr < -30 || _prefs.repeat_min_snr > 20))
-    _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;
+      (_prefs.repeat_min_snr < -20 || _prefs.repeat_min_snr > 10))
+    _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;   // match the UI's -20..10 range
   if (_prefs.repeat_suppress_dup > 1) _prefs.repeat_suppress_dup = 0;
   rd(&_prefs.repeater_use_profile, sizeof(_prefs.repeater_use_profile));
   rd(&_prefs.repeater_freq,        sizeof(_prefs.repeater_freq));

@@ -309,16 +309,17 @@ A single read-only screen of live device and mesh stats, refreshed once a second
 | RSSI/SNR     | Signal strength / signal-to-noise of the last received packet                                      |
 | Pool free    | Free entries in the packet pool                                                                     |
 | Queue        | Packets waiting in the outbound queue                                                               |
+| Errors       | Radio error flags since boot/reset — `OK`, or tokens `F` (queue full), `C` (CAD timeout), `R` (RX-start timeout) |
 
-The packet counters and **Forwarded** are cumulative since boot. Press **Enter** to open a confirm popup that resets them (defaults to *Cancel*); the live readings (noise, RSSI/SNR, pool, queue, uptime) are not affected. **Cancel/Back** returns to the Tools list.
+The packet counters, **Forwarded** and **Errors** are cumulative since boot. **Hold Enter** opens a one-item *Reset counters* menu (Back dismisses it); the live readings (noise, RSSI/SNR, pool, queue, uptime) are not affected. **Cancel/Back** returns to the Tools list.
 
-The counters make the repeater behaviour observable: **Forwarded** confirms the node is actually relaying (not just configured to), and **Pool free** / **Queue** show whether forwarding is exhausting the packet pool. See **Tools › Repeater** for the relaying options (which also shows these same forwarding stats in context).
+The counters make the repeater behaviour observable: **Forwarded** confirms the node is actually relaying (not just configured to), and **Pool free** / **Queue** show whether forwarding is exhausting the packet pool. See **Tools › Repeater** for the relaying options.
 
 ---
 
 ## Repeater
 
-Turns the companion into a packet **repeater** while it keeps working as a normal companion — no separate firmware. By default it relays on its **current** frequency, or you can give it a dedicated radio profile to switch to while relaying (see **Network** below). Loop-detection and an advert flood-depth cap are always applied. This screen keeps the toggle, the network/profile, its flood-filter options, and live forwarding stats together.
+Turns the companion into a packet **repeater** while it keeps working as a normal companion — no separate firmware. By default it relays on its **current** frequency, or you can give it a dedicated radio profile to switch to while relaying (see **Network** below). Loop-detection and an advert flood-depth cap are always applied. This screen keeps the toggle, the network/profile, and its flood-filter options together; live forwarding stats are on **Tools › Diagnostics**.
 
 Navigate with **UP/DOWN**; change a value with **LEFT/RIGHT** (or **Enter** for toggles). **Cancel/Back** saves and returns to Tools.
 
@@ -338,5 +339,9 @@ Navigate with **UP/DOWN**; change a value with **LEFT/RIGHT** (or **Enter** for 
 The five flood filters are **opt-in** (default OFF, so a plain repeater is unaffected) and act on **flood** traffic only — on a direct route this node is the named next hop, so it never drops those.
 
 **Same network vs. separate network.** With **Network = Current** (or a Custom profile set equal to your companion settings) the repeater stays on your own network — you keep messaging while relaying. With a *different* Custom profile the device moves entirely onto that network while relaying (a single radio can't be on two at once) and returns to your companion network when the repeater is switched off. The profile also re-applies after a reboot if the repeater was left on.
+
+While the repeater is on, a **»** indicator appears in the status bar (same blink convention as the auto-advert and trail markers) so you can tell it's relaying at a glance, and **Settings › Radio › Pwr save** is forced off (a repeater must listen continuously) — your power-save setting returns when you switch the repeater off.
+
+Live forwarding stats — **Forwarded**, **Pool free**, **Queue** — are shown on **Tools › Diagnostics**.
 
 While the repeater is ON, the bottom of the screen shows live stats: **Forwarded** (packets actually re-transmitted — reflects Suppress dup), **Pool free**, and **Queue**. The same numbers appear, alongside the full device picture, in **Tools › Diagnostics**.

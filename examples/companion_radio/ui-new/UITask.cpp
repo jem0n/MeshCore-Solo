@@ -478,6 +478,15 @@ class HomeScreen : public UIScreen {
         if (blinkOn()) drawBoxedIcon(display, gX, ind, ind_h, ICON_TRAIL);
         leftmostX = gX - 1;
       }
+
+      // Repeater relaying. Same blink convention — a "leave it on and forget"
+      // mode, so an at-a-glance cue matters (especially on a Custom profile,
+      // where the device is off your own network while this is shown).
+      if (_node_prefs && _node_prefs->client_repeat) {
+        int rX = leftmostX - ind;
+        if (blinkOn()) drawBoxedIcon(display, rX, ind, ind_h, ICON_REPEATER);
+        leftmostX = rX - 1;
+      }
     }
     return leftmostX;
   }
@@ -995,7 +1004,8 @@ public:
     // Any blinking status-bar indicator needs a 1 s refresh to animate evenly —
     // but the status bar (and its icons) is hidden on the CLOCK page, so don't
     // pay the 1 s cadence there for icons that aren't drawn.
-    bool need_blink = (_page != HomePage::CLOCK) && (auto_adv || _task->trail().isActive());
+    bool repeating = _node_prefs && _node_prefs->client_repeat;
+    bool need_blink = (_page != HomePage::CLOCK) && (auto_adv || _task->trail().isActive() || repeating);
     if (Features::IS_EINK) {
       // slow display: poll every 30 s; inbound msgs force immediate refresh via notify()
       return Features::HOME_REFRESH_MS;
@@ -2099,7 +2109,10 @@ void UITask::applyTxPower() {
 
 void UITask::applyPowerSave() {
   if (_node_prefs == NULL) return;
-  radio_driver.setPowerSaving(_node_prefs->rx_powersave);
+  // A repeater must hear every packet to relay it, so duty-cycle RX (which sleeps
+  // between preamble checks) is forced off while repeating — the user's pref is
+  // kept and restored when the repeater is switched off.
+  radio_driver.setPowerSaving(_node_prefs->rx_powersave && !_node_prefs->client_repeat);
 }
 
 void UITask::applyApc() {

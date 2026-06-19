@@ -453,10 +453,10 @@ Tracker L1 OLED/e-ink, GAT562 30S). All on `feature/companion-repeater-presets`.
   flood-depth cap are always applied. Packet pool bumped 16→32 to match the
   repeater workload (a too-small pool starved channel/DM reception once relaying
   queued retransmits).
-- **Consolidated on Tools › Repeater** — the toggle, the five filters, and live
-  forwarding stats (Forwarded / Pool free / Queue) share one full-width screen,
-  rather than the original Settings › Radio sub-items (whose indented labels
-  collided with the value column on a 128px OLED).
+- **Consolidated on Tools › Repeater** — the toggle and the five filters share
+  one full-width screen, rather than the original Settings › Radio sub-items
+  (whose indented labels collided with the value column on a 128px OLED). Live
+  forwarding stats (Forwarded / Pool free / Queue) stay on Tools › Diagnostics.
 - **Optional dedicated radio profile** (`Network: Current/Custom`,
   `repeater_use_profile` + `repeater_freq/bw/sf/cr`). Custom switches the radio to
   a preset/manual profile when the repeater is enabled and restores the

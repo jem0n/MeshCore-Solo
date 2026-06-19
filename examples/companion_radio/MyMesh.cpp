@@ -1421,7 +1421,7 @@ void MyMesh::begin(bool has_display) {
   applyRepeaterRadio();   // companion params, or the repeater profile if relaying with one set
   applyApc();                                         // sets TX power to the ceiling and arms APC if enabled
   radio_driver.setRxBoostedGainMode(_prefs.rx_boosted_gain);
-  radio_driver.setPowerSaving(_prefs.rx_powersave);   // hardware duty-cycle RX (battery saver)
+  radio_driver.setPowerSaving(_prefs.rx_powersave && !_prefs.client_repeat);   // duty-cycle RX off while repeating (must hear all traffic)
   MESH_DEBUG_PRINTLN("RX Boosted Gain Mode: %s",
                      radio_driver.getRxBoostedGainMode() ? "Enabled" : "Disabled");
 }
@@ -1861,6 +1861,9 @@ void MyMesh::handleCmdFrame(size_t len) {
       savePrefs();
 
       radio_driver.setParams(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+      // Keep the "repeating ⇒ continuous RX" invariant when repeat is toggled via
+      // the app, mirroring the on-device path (a repeater must hear all traffic).
+      radio_driver.setPowerSaving(_prefs.rx_powersave && !_prefs.client_repeat);
       MESH_DEBUG_PRINTLN("OK: CMD_SET_RADIO_PARAMS: f=%d, bw=%d, sf=%d, cr=%d", freq, bw, (uint32_t)sf,
                          (uint32_t)cr);
 

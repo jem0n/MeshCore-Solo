@@ -158,6 +158,13 @@ MINI_ICON(ICON_TRAIL, 6,   // map pin / location marker (GPS trail logging)
   packRow(".####."),
   packRow("..##.."));
 
+MINI_ICON(ICON_REPEATER, 6,   // » double chevron — relaying/forwarding (repeater active)
+  packRow("#..#.."),
+  packRow(".#..#."),
+  packRow("..#..#"),
+  packRow(".#..#."),
+  packRow("#..#.."));
+
 // Trail-map markers — centred on a point (see miniIconDrawCentered) rather
 // than anchored to a text line.
 MINI_ICON(ICON_MAP_DOT, 3,        // ● filled trail point

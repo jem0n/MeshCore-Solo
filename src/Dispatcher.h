@@ -197,6 +197,7 @@ public:
   uint32_t getNumRecvByType(uint8_t payload_type) const { return n_recv_by_type[payload_type & 0x0F]; }
   int getPoolFreeCount() const { return _mgr->getFreeCount(); }
   int getOutboundQueueLen() const { return _mgr->getOutboundTotal(); }
+  uint16_t getErrFlags() const { return _err_flags; }   // ERR_EVENT_* bitmask since last resetStats()
   virtual void resetStats() {
     n_sent_flood = n_sent_direct = n_recv_flood = n_recv_direct = 0;
     memset(n_sent_by_type, 0, sizeof(n_sent_by_type));

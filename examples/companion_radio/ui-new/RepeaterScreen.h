@@ -172,12 +172,10 @@ public:
     int visible = display.listVisible(item_h);
     if (visible < 1) visible = 1;
 
-    bool show_stats = p && p->client_repeat;
-    int total = _item_count + (show_stats ? 3 : 0);
-
+    // Config only — live forwarding stats live on Tools › Diagnostics.
+    int total = _item_count;
     if (_sel < _scroll)            _scroll = _sel;
     if (_sel >= _scroll + visible) _scroll = _sel - visible + 1;
-    if (_sel == _item_count - 1)   _scroll = total - visible;  // reveal stats tail on last item
     int max_scroll = total - visible;
     if (max_scroll < 0) max_scroll = 0;
     if (_scroll > max_scroll) _scroll = max_scroll;
@@ -188,35 +186,23 @@ public:
       int row = _scroll + i;
       int y = start_y + i * item_h;
       char val[16];
-      if (row < _item_count) {
-        bool sel = (row == _sel);
-        int item = _items[row];
-        display.drawSelectionRow(0, y - 1, display.width() - reserve, item_h - 1, sel);
-        display.setCursor(2, y);
-        display.print(itemLabel(item));
-        if (item == IT_RFREQ && sel && _freq_editor.active) {
-          _freq_editor.render(display, valCol(display), y);
-        } else {
-          itemValue(item, p, val, sizeof(val));
-          display.drawTextRightAlign(display.width() - reserve - 2, y, val);
-        }
-        display.setColor(DisplayDriver::LIGHT);
+      bool sel = (row == _sel);
+      int item = _items[row];
+      display.drawSelectionRow(0, y - 1, display.width() - reserve, item_h - 1, sel);
+      display.setCursor(2, y);
+      display.print(itemLabel(item));
+      if (item == IT_RFREQ && sel && _freq_editor.active) {
+        _freq_editor.render(display, valCol(display), y);
       } else {
-        int s = row - _item_count;
-        const char* label = (s == 0) ? "Forwarded" : (s == 1) ? "Pool free" : "Queue";
-        if (s == 0) snprintf(val, sizeof(val), "%lu", (unsigned long)the_mesh.getNumForwarded());
-        else if (s == 1) snprintf(val, sizeof(val), "%d", the_mesh.getPoolFreeCount());
-        else snprintf(val, sizeof(val), "%d", the_mesh.getOutboundQueueLen());
-        display.setColor(DisplayDriver::LIGHT);
-        display.setCursor(2, y);
-        display.print(label);
+        itemValue(item, p, val, sizeof(val));
         display.drawTextRightAlign(display.width() - reserve - 2, y, val);
       }
+      display.setColor(DisplayDriver::LIGHT);
     }
     drawScrollIndicator(display, start_y, visible * item_h, total, visible, _scroll);
     display.setColor(DisplayDriver::LIGHT);
     if (_preset_menu.active) _preset_menu.render(display);
-    return (_preset_menu.active || _freq_editor.active) ? 50 : (show_stats ? 1000 : 500);
+    return (_preset_menu.active || _freq_editor.active) ? 50 : 500;
   }
 
   // x where the right-side value column starts (matches Settings' valCol math).
@@ -273,6 +259,7 @@ public:
     if (item == IT_REPEATER && (left || right || enter)) {
       p->client_repeat ^= 1;
       the_mesh.applyRepeaterRadio();   // switch to profile on enable / restore companion on disable
+      _task->applyPowerSave();         // duty-cycle RX is forced off while repeating
       buildItems(p);
       _dirty = true;
       return true;

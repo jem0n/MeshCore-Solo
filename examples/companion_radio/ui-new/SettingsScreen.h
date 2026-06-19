@@ -607,7 +607,9 @@ class SettingsScreen : public UIScreen {
     } else if (item == POWER_SAVE) {
       display.print("Pwr save");
       display.setCursor(valCol(display), y);
-      display.print((p && p->rx_powersave) ? "ON" : "OFF");
+      // Forced off (and locked) while the repeater is on — it must hear all traffic.
+      if (p && p->client_repeat) display.print("--");
+      else display.print((p && p->rx_powersave) ? "ON" : "OFF");
     } else if (item == TX_APC) {
       display.print("Auto pwr");
       display.setCursor(valCol(display), y);
@@ -998,6 +1000,7 @@ public:
       if (left  && p->cr > 5) { p->cr--; _task->applyRadioParams(); _dirty = true; return true; }
     }
     if (_selected == POWER_SAVE && p && (left || right || enter)) {
+      if (p->client_repeat) { _task->showAlert("Off while repeating", 900); return true; }
       p->rx_powersave ^= 1;
       _task->applyPowerSave();
       _dirty = true;
