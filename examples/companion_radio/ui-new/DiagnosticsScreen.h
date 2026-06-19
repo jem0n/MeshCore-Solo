@@ -110,6 +110,8 @@ class DiagnosticsScreen : public UIScreen {
       if (err & ERR_EVENT_FULL)            strcat(buf, "F ");
       if (err & ERR_EVENT_CAD_TIMEOUT)     strcat(buf, "C ");
       if (err & ERR_EVENT_STARTRX_TIMEOUT) strcat(buf, "R ");
+      int len = strlen(buf);   // drop the trailing space so right-alignment sits flush
+      if (len > 0 && buf[len - 1] == ' ') buf[len - 1] = '\0';
     }
     addRow("Errors", buf);
   }
