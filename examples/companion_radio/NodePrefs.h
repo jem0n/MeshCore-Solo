@@ -291,3 +291,23 @@ struct NodePrefs {  // persisted to file
     if (pos < size) buf[pos] = '\0';
   }
 };
+
+// Bounds for a usable repeater radio profile — must match the radio chip's own
+// validated range (see CustomSX1262Wrapper::getFreqBounds(), 150-960 MHz), so
+// a profile that passes here is guaranteed to actually take effect on the radio.
+static inline bool isValidRepeaterProfile(float freq, float bw, uint8_t sf, uint8_t cr) {
+  return freq >= 150.0f && freq <= 960.0f
+      && sf >= 5 && sf <= 12
+      && cr >= 5 && cr <= 8
+      && bw >= 7.0f && bw <= 510.0f;
+}
+
+// Seed a never-configured repeater profile in the same band as the companion's
+// own network (see defaultRepeaterFreqForBand() above for why).
+static inline void seedDefaultRepeaterProfile(NodePrefs& prefs) {
+  prefs.repeater_use_profile = 1;
+  prefs.repeater_freq = defaultRepeaterFreqForBand(prefs.freq);
+  prefs.repeater_bw   = LORA_BW;
+  prefs.repeater_sf   = LORA_SF;
+  prefs.repeater_cr   = LORA_CR;
+}

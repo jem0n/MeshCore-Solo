@@ -102,10 +102,6 @@ class SettingsScreen : public UIScreen {
   static const int SOUND_COUNT = 4;
   static const char* AD_SCOPE_LABELS[2];
   static const int AD_SCOPE_COUNT = 2;
-  // Standard SX126x/SX127x LoRa bandwidths (kHz) — manual BW field cycles through
-  // these rather than a free-form value, so it can't land on an unsupported setting.
-  static const float CUSTOM_BW_OPTS[10];
-  static const int CUSTOM_BW_COUNT = 10;
 #if FEAT_FULL_REFRESH_SETTING
   static const char* EINK_FULL_REFRESH_LABELS[5];
   static const int   EINK_FULL_REFRESH_COUNT = 5;
@@ -120,7 +116,7 @@ class SettingsScreen : public UIScreen {
   }
 
   static bool matchesPreset(NodePrefs* p, float freq, float bw, uint8_t sf, uint8_t cr) {
-    return fabsf(p->freq - freq) < 0.001f && fabsf(p->bw - bw) < 0.001f && p->sf == sf && p->cr == cr;
+    return radioParamsMatchPreset(p->freq, p->bw, p->sf, p->cr, freq, bw, sf, cr);
   }
 
   // Display name for the Preset row: a built-in preset, a saved user preset, or
@@ -179,14 +175,14 @@ class SettingsScreen : public UIScreen {
     _task->showAlert("Preset saved", 800);
   }
 
-  // Nearest entry in CUSTOM_BW_OPTS to the current bw (also used to step left/right).
+  // Nearest entry in LORA_BW_OPTS to the current bw (also used to step left/right).
   int customBwIndex() {
     NodePrefs* p = _task->getNodePrefs();
     float bw = p ? p->bw : 62.5f;
     int best = 0;
     float best_diff = 1e9f;
-    for (int i = 0; i < CUSTOM_BW_COUNT; i++) {
-      float diff = fabsf(bw - CUSTOM_BW_OPTS[i]);
+    for (int i = 0; i < LORA_BW_OPT_COUNT; i++) {
+      float diff = fabsf(bw - LORA_BW_OPTS[i]);
       if (diff < best_diff) { best_diff = diff; best = i; }
     }
     return best;
@@ -994,8 +990,8 @@ public:
     }
     if (_selected == CUSTOM_BW && p) {
       int idx = customBwIndex();
-      if (right && idx < CUSTOM_BW_COUNT - 1) { p->bw = CUSTOM_BW_OPTS[idx + 1]; _task->applyRadioParams(); _dirty = true; return true; }
-      if (left  && idx > 0)                   { p->bw = CUSTOM_BW_OPTS[idx - 1]; _task->applyRadioParams(); _dirty = true; return true; }
+      if (right && idx < LORA_BW_OPT_COUNT - 1) { p->bw = LORA_BW_OPTS[idx + 1]; _task->applyRadioParams(); _dirty = true; return true; }
+      if (left  && idx > 0)                     { p->bw = LORA_BW_OPTS[idx - 1]; _task->applyRadioParams(); _dirty = true; return true; }
     }
     if (_selected == CUSTOM_CR && p) {
       if (right && p->cr < 8) { p->cr++; _task->applyRadioParams(); _dirty = true; return true; }
@@ -1142,4 +1138,3 @@ const char*    SettingsScreen::AD_SCOPE_LABELS[2] = { "All", "Zero-hop" };
 #if FEAT_FULL_REFRESH_SETTING
 const char* SettingsScreen::EINK_FULL_REFRESH_LABELS[5] = { "off", "5", "10", "20", "30" };
 #endif
-const float SettingsScreen::CUSTOM_BW_OPTS[10] = { 7.8f, 10.4f, 15.6f, 20.8f, 31.25f, 41.7f, 62.5f, 125.0f, 250.0f, 500.0f };

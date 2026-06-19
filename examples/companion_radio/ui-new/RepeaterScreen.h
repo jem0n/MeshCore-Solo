@@ -45,15 +45,15 @@ class RepeaterScreen : public UIScreen {
   uint8_t    _preset_user_slot[NodePrefs::USER_RADIO_PRESET_MAX];
   int        _preset_user_count = 0;
 
-  static const float* bwOpts(int& count) {
-    static const float OPTS[] = { 7.8f, 10.4f, 15.6f, 20.8f, 31.25f, 41.7f, 62.5f, 125.0f, 250.0f, 500.0f };
-    count = 10;
-    return OPTS;
-  }
+  // Nearest entry in LORA_BW_OPTS to the repeater profile's bw.
   int rptBwIndex(NodePrefs* p) const {
-    int n; const float* o = bwOpts(n);
-    for (int i = 0; i < n; i++) if (o[i] == p->repeater_bw) return i;
-    return 6;  // default to 62.5
+    int best = 0;
+    float best_diff = 1e9f;
+    for (int i = 0; i < LORA_BW_OPT_COUNT; i++) {
+      float diff = fabsf(p->repeater_bw - LORA_BW_OPTS[i]);
+      if (diff < best_diff) { best_diff = diff; best = i; }
+    }
+    return best;
   }
 
   void buildItems(NodePrefs* p) {
@@ -100,13 +100,13 @@ class RepeaterScreen : public UIScreen {
   const char* rptPresetName(NodePrefs* p) const {
     for (int i = 0; i < RADIO_PRESET_COUNT; i++) {
       const RadioPreset& r = RADIO_PRESETS[i];
-      if (r.freq == p->repeater_freq && r.bw == p->repeater_bw && r.sf == p->repeater_sf && r.cr == p->repeater_cr)
+      if (radioParamsMatchPreset(p->repeater_freq, p->repeater_bw, p->repeater_sf, p->repeater_cr, r.freq, r.bw, r.sf, r.cr))
         return r.name;
     }
     for (int i = 0; i < NodePrefs::USER_RADIO_PRESET_MAX; i++) {
       const NodePrefs::UserRadioPreset& u = p->user_radio_presets[i];
       if (!u.name[0]) continue;
-      if (u.freq == p->repeater_freq && u.bw == p->repeater_bw && u.sf == p->repeater_sf && u.cr == p->repeater_cr)
+      if (radioParamsMatchPreset(p->repeater_freq, p->repeater_bw, p->repeater_sf, p->repeater_cr, u.freq, u.bw, u.sf, u.cr))
         return u.name;
     }
     return "Custom";
@@ -196,7 +196,7 @@ public:
       display.setCursor(2, y);
       display.print(itemLabel(item));
       if (item == IT_RFREQ && sel && _freq_editor.active) {
-        _freq_editor.render(display, valCol(display), y);
+        _freq_editor.render(display, display.valCol(), y);
       } else {
         itemValue(item, p, val, sizeof(val));
         display.drawTextRightAlign(display.width() - reserve - 2, y, val);
@@ -208,9 +208,6 @@ public:
     if (_preset_menu.active) _preset_menu.render(display);
     return (_preset_menu.active || _freq_editor.active) ? 50 : 500;
   }
-
-  // x where the right-side value column starts (matches Settings' valCol math).
-  static int valCol(DisplayDriver& d) { return d.width() - d.getCharWidth() * 8; }
 
   bool handleInput(char c) override {
     NodePrefs* p = _task->getNodePrefs();
@@ -289,9 +286,9 @@ public:
       if (left  && p->repeater_sf > 5)  { p->repeater_sf--; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }
     }
     if (item == IT_RBW) {
-      int n; const float* o = bwOpts(n); int idx = rptBwIndex(p);
-      if (right && idx < n - 1) { p->repeater_bw = o[idx + 1]; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }
-      if (left  && idx > 0)     { p->repeater_bw = o[idx - 1]; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }
+      int idx = rptBwIndex(p);
+      if (right && idx < LORA_BW_OPT_COUNT - 1) { p->repeater_bw = LORA_BW_OPTS[idx + 1]; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }
+      if (left  && idx > 0)                     { p->repeater_bw = LORA_BW_OPTS[idx - 1]; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }
     }
     if (item == IT_RCR) {
       if (right && p->repeater_cr < 8) { p->repeater_cr++; the_mesh.applyRepeaterRadio(); _dirty = true; return true; }

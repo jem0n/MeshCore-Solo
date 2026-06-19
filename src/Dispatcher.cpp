@@ -272,7 +272,7 @@ void Dispatcher::suppressQueuedDuplicate(Packet* pkt) {
   int n = _mgr->getOutboundTotal();
   for (int i = 0; i < n; i++) {
     Packet* q = _mgr->getOutboundByIdx(i);
-    if (q == NULL) continue;
+    if (q == NULL || !q->isRouteFlood()) continue;   // only ever suppress a queued flood retransmit
     uint8_t qh[MAX_HASH_SIZE];
     q->calculatePacketHash(qh);
     if (memcmp(h, qh, MAX_HASH_SIZE) == 0) {

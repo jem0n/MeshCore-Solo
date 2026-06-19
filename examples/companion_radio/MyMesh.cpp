@@ -1309,12 +1309,8 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   _prefs.tx_power_dbm = LORA_TX_POWER;
   // Repeater profile default for a true first boot (no prefs file yet, so
   // loadPrefs() below is a no-op) — same band-matched seed as the upgrade
-  // path in DataStore.cpp, kept in sync rather than left at memset's 0/Current.
-  _prefs.repeater_use_profile = 1;
-  _prefs.repeater_freq = defaultRepeaterFreqForBand(_prefs.freq);
-  _prefs.repeater_bw   = LORA_BW;
-  _prefs.repeater_sf   = LORA_SF;
-  _prefs.repeater_cr   = LORA_CR;
+  // path in DataStore.cpp.
+  seedDefaultRepeaterProfile(_prefs);
   _prefs.gps_enabled = 0;       // GPS disabled by default
   _prefs.gps_interval = 0;      // No automatic GPS updates by default
   _prefs.display_brightness = 2; // medium brightness by default
@@ -1868,7 +1864,7 @@ void MyMesh::handleCmdFrame(size_t len) {
       _prefs.client_repeat = repeat;
       savePrefs();
 
-      radio_driver.setParams(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+      applyRepeaterRadio();   // companion params, or the repeater profile if relaying with one set
       // Keep the "repeating ⇒ continuous RX, full TX power" invariants when repeat
       // is toggled via the app, mirroring the on-device path (a repeater must hear
       // all traffic and relay at consistent power).

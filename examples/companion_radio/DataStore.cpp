@@ -364,15 +364,8 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   // norm; that stays opt-in. Band-matched rather than a flat frequency so the
   // default can't land outside what's legal where the companion is set up.
   if (_prefs.repeater_use_profile > 1) _prefs.repeater_use_profile = 0;
-  if (!(_prefs.repeater_freq >= 100.0f && _prefs.repeater_freq <= 960.0f
-        && _prefs.repeater_sf >= 5 && _prefs.repeater_sf <= 12
-        && _prefs.repeater_cr >= 5 && _prefs.repeater_cr <= 8
-        && _prefs.repeater_bw >= 7.0f && _prefs.repeater_bw <= 510.0f)) {
-    _prefs.repeater_use_profile = 1;
-    _prefs.repeater_freq = defaultRepeaterFreqForBand(_prefs.freq);
-    _prefs.repeater_bw   = LORA_BW;
-    _prefs.repeater_sf   = LORA_SF;
-    _prefs.repeater_cr   = LORA_CR;
+  if (!isValidRepeaterProfile(_prefs.repeater_freq, _prefs.repeater_bw, _prefs.repeater_sf, _prefs.repeater_cr)) {
+    seedDefaultRepeaterProfile(_prefs);
   }
   // → 0xC0DE000B: append bot_commands_enabled + quiet-hours. Older files leave
   // stray bytes here; clamp so upgraders fall back to off / no quiet hours.

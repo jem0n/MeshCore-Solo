@@ -2125,7 +2125,7 @@ void UITask::applyApc() {
 
 void UITask::applyRadioParams() {
   if (_node_prefs == NULL) return;
-  radio_driver.setParams(_node_prefs->freq, _node_prefs->bw, _node_prefs->sf, _node_prefs->cr);
+  the_mesh.applyRepeaterRadio();   // companion params, or the repeater profile if relaying with one set
 }
 
 void UITask::applyBrightness() {
