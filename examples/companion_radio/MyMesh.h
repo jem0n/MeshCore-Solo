@@ -228,6 +228,19 @@ public:
   DataStore* getDataStore() const { return _store; }
   void applyApc();   // (re)initialise Adaptive Power Control from prefs
 
+  // True when the optional repeater radio profile is a valid LoRa config.
+  bool repeaterProfileValid() const {
+    return _prefs.repeater_freq >= 100.0f && _prefs.repeater_freq <= 960.0f
+        && _prefs.repeater_sf >= 5 && _prefs.repeater_sf <= 12
+        && _prefs.repeater_cr >= 5 && _prefs.repeater_cr <= 8
+        && _prefs.repeater_bw >= 7.0f && _prefs.repeater_bw <= 510.0f;
+  }
+  // Load the radio with the correct params for the current mode: the repeater
+  // profile when relaying with a valid dedicated profile, otherwise the
+  // companion's own params. Single source of truth, used at boot and whenever
+  // the repeater toggle / network / profile changes.
+  void applyRepeaterRadio();
+
   bool isAckPending(uint32_t expected_ack) const {
     for (int i = 0; i < EXPECTED_ACK_TABLE_SIZE; i++)
       if (expected_ack_table[i].ack == expected_ack) return true;

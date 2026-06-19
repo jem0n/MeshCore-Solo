@@ -173,11 +173,21 @@ struct NodePrefs {  // persisted to file
   static const int8_t REPEAT_SNR_DISABLED = -128;
   uint8_t  repeat_suppress_dup;
 
+  // Optional dedicated radio profile for repeater mode. When repeater_use_profile
+  // is 1, enabling the repeater switches the radio to repeater_freq/bw/sf/cr and
+  // disabling restores the companion's freq/bw/sf/cr (the fields above). 0 = the
+  // repeater stays on the current companion frequency (default — no switch).
+  uint8_t  repeater_use_profile;
+  float    repeater_freq;
+  float    repeater_bw;
+  uint8_t  repeater_sf;
+  uint8_t  repeater_cr;
+
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE000F;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0010;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage

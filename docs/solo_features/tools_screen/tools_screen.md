@@ -8,7 +8,7 @@
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
 
-The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, compass, and device diagnostics. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
+The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, compass, device diagnostics, and repeater mode. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
 
 ---
 
@@ -312,4 +312,31 @@ A single read-only screen of live device and mesh stats, refreshed once a second
 
 The packet counters and **Forwarded** are cumulative since boot. Press **Enter** to open a confirm popup that resets them (defaults to *Cancel*); the live readings (noise, RSSI/SNR, pool, queue, uptime) are not affected. **Cancel/Back** returns to the Tools list.
 
-The counters make the repeater behaviour observable: **Forwarded** confirms the node is actually relaying (not just configured to), and **Pool free** / **Queue** show whether forwarding is exhausting the packet pool. See **Settings › Radio › Repeater** for the relaying options.
+The counters make the repeater behaviour observable: **Forwarded** confirms the node is actually relaying (not just configured to), and **Pool free** / **Queue** show whether forwarding is exhausting the packet pool. See **Tools › Repeater** for the relaying options (which also shows these same forwarding stats in context).
+
+---
+
+## Repeater
+
+Turns the companion into a packet **repeater** while it keeps working as a normal companion — no separate firmware. By default it relays on its **current** frequency, or you can give it a dedicated radio profile to switch to while relaying (see **Network** below). Loop-detection and an advert flood-depth cap are always applied. This screen keeps the toggle, the network/profile, its flood-filter options, and live forwarding stats together.
+
+Navigate with **UP/DOWN**; change a value with **LEFT/RIGHT** (or **Enter** for toggles). **Cancel/Back** saves and returns to Tools.
+
+| Setting        | Options         | Notes                                                                                                          |
+| -------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
+| Repeater       | ON / OFF        | Master switch. The options below appear only while it is ON.                                                    |
+| Network        | Current / Custom | **Current**: relay on the companion's own frequency (default). **Custom**: enabling the repeater switches the radio to a dedicated profile (below) and disabling restores the companion's settings — so you can drop onto a separate repeater network and come back. Switching to Custom seeds the profile from your current settings. |
+| Rpt preset     | named presets   | _(Custom only)_ **Enter** picks a community/saved preset for the repeater profile. |
+| Rpt freq       | chip range      | _(Custom only)_ **Enter** opens the digit-by-digit editor (chip-validated bounds). |
+| Rpt SF / BW / CR | 5–12 / 7.8–500 kHz / 5–8 | _(Custom only)_ **LEFT/RIGHT** to adjust the profile's spreading factor, bandwidth, coding rate. |
+| Skip advert    | ON / OFF        | Don't re-flood **advert** packets (the highest-volume flood traffic); messages and acks still relay.           |
+| Max hops       | OFF / 1–8       | Drop a flood packet once it has already travelled this many hops.                                              |
+| Yield          | OFF / x2–x9     | Scales the retransmit delay for **forwarded** floods only (your own sends are unaffected), so a mobile companion defers to better-sited fixed repeaters. Widens the window for **Suppress dup**. |
+| Min SNR        | OFF / −20…10 dB | Drop a flood copy received below this signal-to-noise threshold, so marginal fringe traffic isn't re-flooded.   |
+| Suppress dup   | ON / OFF        | If the same flood packet is overheard from another node while still queued to retransmit, cancel our copy — a peer already relayed it. Cuts redundant airtime in dense meshes; pairs with **Yield**. |
+
+The five flood filters are **opt-in** (default OFF, so a plain repeater is unaffected) and act on **flood** traffic only — on a direct route this node is the named next hop, so it never drops those.
+
+**Same network vs. separate network.** With **Network = Current** (or a Custom profile set equal to your companion settings) the repeater stays on your own network — you keep messaging while relaying. With a *different* Custom profile the device moves entirely onto that network while relaying (a single radio can't be on two at once) and returns to your companion network when the repeater is switched off. The profile also re-applies after a reboot if the repeater was left on.
+
+While the repeater is ON, the bottom of the screen shows live stats: **Forwarded** (packets actually re-transmitted — reflects Suppress dup), **Pool free**, and **Queue**. The same numbers appear, alongside the full device picture, in **Tools › Diagnostics**.

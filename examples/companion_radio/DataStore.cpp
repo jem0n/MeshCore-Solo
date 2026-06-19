@@ -351,6 +351,22 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
       (_prefs.repeat_min_snr < -30 || _prefs.repeat_min_snr > 20))
     _prefs.repeat_min_snr = NodePrefs::REPEAT_SNR_DISABLED;
   if (_prefs.repeat_suppress_dup > 1) _prefs.repeat_suppress_dup = 0;
+  rd(&_prefs.repeater_use_profile, sizeof(_prefs.repeater_use_profile));
+  rd(&_prefs.repeater_freq,        sizeof(_prefs.repeater_freq));
+  rd(&_prefs.repeater_bw,          sizeof(_prefs.repeater_bw));
+  rd(&_prefs.repeater_sf,          sizeof(_prefs.repeater_sf));
+  rd(&_prefs.repeater_cr,          sizeof(_prefs.repeater_cr));
+  // Pre-0x10 files leave stray sentinel bytes here. If the profile fields aren't a
+  // valid radio config, force the profile off so the repeater can't switch to junk.
+  if (_prefs.repeater_use_profile > 1) _prefs.repeater_use_profile = 0;
+  if (!(_prefs.repeater_freq >= 100.0f && _prefs.repeater_freq <= 960.0f
+        && _prefs.repeater_sf >= 5 && _prefs.repeater_sf <= 12
+        && _prefs.repeater_cr >= 5 && _prefs.repeater_cr <= 8
+        && _prefs.repeater_bw >= 7.0f && _prefs.repeater_bw <= 510.0f)) {
+    _prefs.repeater_use_profile = 0;
+    _prefs.repeater_freq = _prefs.repeater_bw = 0.0f;
+    _prefs.repeater_sf = _prefs.repeater_cr = 0;
+  }
   // → 0xC0DE000B: append bot_commands_enabled + quiet-hours. Older files leave
   // stray bytes here; clamp so upgraders fall back to off / no quiet hours.
   if (_prefs.bot_commands_enabled > 1)  _prefs.bot_commands_enabled = 0;
@@ -513,6 +529,11 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.repeat_delay_boost,   sizeof(_prefs.repeat_delay_boost));
     file.write((uint8_t *)&_prefs.repeat_min_snr,       sizeof(_prefs.repeat_min_snr));
     file.write((uint8_t *)&_prefs.repeat_suppress_dup,  sizeof(_prefs.repeat_suppress_dup));
+    file.write((uint8_t *)&_prefs.repeater_use_profile, sizeof(_prefs.repeater_use_profile));
+    file.write((uint8_t *)&_prefs.repeater_freq,        sizeof(_prefs.repeater_freq));
+    file.write((uint8_t *)&_prefs.repeater_bw,          sizeof(_prefs.repeater_bw));
+    file.write((uint8_t *)&_prefs.repeater_sf,          sizeof(_prefs.repeater_sf));
+    file.write((uint8_t *)&_prefs.repeater_cr,          sizeof(_prefs.repeater_cr));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

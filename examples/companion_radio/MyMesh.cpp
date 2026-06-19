@@ -1418,12 +1418,19 @@ void MyMesh::begin(bool has_display) {
   addChannel("Public", PUBLIC_GROUP_PSK); // pre-configure Andy's public channel
   _store->loadChannels(this);
 
-  radio_driver.setParams(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
+  applyRepeaterRadio();   // companion params, or the repeater profile if relaying with one set
   applyApc();                                         // sets TX power to the ceiling and arms APC if enabled
   radio_driver.setRxBoostedGainMode(_prefs.rx_boosted_gain);
   radio_driver.setPowerSaving(_prefs.rx_powersave);   // hardware duty-cycle RX (battery saver)
   MESH_DEBUG_PRINTLN("RX Boosted Gain Mode: %s",
                      radio_driver.getRxBoostedGainMode() ? "Enabled" : "Disabled");
+}
+
+void MyMesh::applyRepeaterRadio() {
+  if (_prefs.client_repeat && _prefs.repeater_use_profile && repeaterProfileValid())
+    radio_driver.setParams(_prefs.repeater_freq, _prefs.repeater_bw, _prefs.repeater_sf, _prefs.repeater_cr);
+  else
+    radio_driver.setParams(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
 }
 
 const char *MyMesh::getNodeName() {

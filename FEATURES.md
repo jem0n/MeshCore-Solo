@@ -446,16 +446,28 @@ left (PPK2 current measurement, multi-hop APC gating).
 On-device repeater for the Solo companion, scoped to the SX1262 boards (Wio
 Tracker L1 OLED/e-ink, GAT562 30S). All on `feature/companion-repeater-presets`.
 
-- **Repeater toggle** (`client_repeat`, Settings › Radio) — the companion relays
+- **Repeater toggle** (`client_repeat`, Tools › Repeater) — the companion relays
   flood/direct traffic on its **current** frequency (no dedicated band), still
   working as a normal companion. `MyMesh::allowPacketForward` gates it; loop
   detection (`isRepeatLooped`, ported from `simple_repeater`) and an advert
   flood-depth cap are always applied. Packet pool bumped 16→32 to match the
   repeater workload (a too-small pool starved channel/DM reception once relaying
   queued retransmits).
+- **Consolidated on Tools › Repeater** — the toggle, the five filters, and live
+  forwarding stats (Forwarded / Pool free / Queue) share one full-width screen,
+  rather than the original Settings › Radio sub-items (whose indented labels
+  collided with the value column on a 128px OLED).
+- **Optional dedicated radio profile** (`Network: Current/Custom`,
+  `repeater_use_profile` + `repeater_freq/bw/sf/cr`). Custom switches the radio to
+  a preset/manual profile when the repeater is enabled and restores the
+  companion's params when disabled (user-chosen revert-on-disable); a profile
+  equal to the companion = "same network", a different one = drop onto a separate
+  repeater network. `MyMesh::applyRepeaterRadio()` is the single decision point,
+  called at boot and on every toggle/edit; `repeaterProfileValid()` gates it.
+  Schema sentinel `0xC0DE0010`, profile cleared to off if load finds an invalid
+  config (stray bytes from older files).
 - **Politeness knobs** (all opt-in, default off, flood-only — a direct route's
-  named next hop is never dropped). Shown under Radio only while the repeater is
-  on:
+  named next hop is never dropped). Shown only while the repeater is on:
   - **Skip advert** — don't re-flood adverts (highest-volume flood).
   - **Max hops** — drop a flood past N hops.
   - **Yield** — scale the retransmit delay for *forwarded* floods only
