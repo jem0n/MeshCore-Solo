@@ -485,12 +485,21 @@ Tracker L1 OLED/e-ink, GAT562 30S). All on `feature/companion-repeater-presets`.
   RX/TX counters (generic `Dispatcher::n_recv_by_type`/`n_sent_by_type`), uptime,
   heap + stack (new `DeviceDiag` helper, nRF52 linker-symbol/`sbrk` heap +
   FreeRTOS stack high-water), noise floor, RSSI/SNR, pool free, outbound queue,
-  and **Forwarded** (`Mesh::n_forwarded` — actual retransmits; backed out on
-  overhear cancel so it reflects what hits the air). Enter opens a confirm popup
-  to reset the cumulative counters (`resetStats` made virtual; `Mesh` override
-  also clears `n_forwarded`).
-- Prefs persisted behind schema sentinels `0xC0DE000E` (four knobs) then
-  `0xC0DE000F` (suppress-dup), with stray-byte clamps for upgraders.
+  **Forwarded** (`Mesh::n_forwarded` — actual retransmits; backed out on overhear
+  cancel so it reflects what hits the air), and **Errors** (Dispatcher
+  `ERR_EVENT_*` flags decoded to F/C/R). Hold Enter opens a one-item "Reset
+  counters" menu (Back dismisses) — `resetStats` made virtual; `Mesh` override
+  also clears `n_forwarded`.
+- **Radio settings locked while relaying** — a repeater must hear all traffic and
+  relay at consistent power, so duty-cycle RX ("Pwr save") and APC ("Auto pwr")
+  are forced off whenever `client_repeat` is on (effective `pref && !client_repeat`
+  via `applyPowerSave()` / `apcActive()`), applied at boot, on the on-device
+  toggle, and on the app's `CMD_SET_RADIO_PARAMS`; Settings shows `--` and blocks
+  the toggle, preserving the user's pref for when the repeater goes off. A
+  blinking `»` status-bar indicator (`ICON_REPEATER`) shows relaying at a glance.
+- Prefs persisted behind schema sentinels `0xC0DE000E` (four knobs),
+  `0xC0DE000F` (suppress-dup), `0xC0DE0010` (radio profile), with stray-byte
+  clamps for upgraders.
 - **Open question:** the app-side dedicated-band gate in `CMD_SET_RADIO_PARAMS`
   was commented out (not deleted) to match the on-device toggle's any-frequency
   behaviour — undecided whether that gate was UX-only or regulatory.

@@ -613,7 +613,9 @@ class SettingsScreen : public UIScreen {
     } else if (item == TX_APC) {
       display.print("Auto pwr");
       display.setCursor(valCol(display), y);
-      display.print((p && p->tx_apc) ? "ON" : "OFF");
+      // Suppressed (and locked) while repeating — a repeater holds full TX power.
+      if (p && p->client_repeat) display.print("--");
+      else display.print((p && p->tx_apc) ? "ON" : "OFF");
 #if AUTO_OFF_MILLIS > 0
     } else if (item == AUTO_OFF) {
       display.print("AutoOff");
@@ -1007,6 +1009,7 @@ public:
       return true;
     }
     if (_selected == TX_APC && p && (left || right || enter)) {
+      if (p->client_repeat) { _task->showAlert("Off while repeating", 900); return true; }
       p->tx_apc ^= 1;
       _task->applyApc();
       _dirty = true;

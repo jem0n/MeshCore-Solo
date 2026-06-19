@@ -156,6 +156,11 @@ protected:
   // Overhear suppression only makes sense while repeating; gated behind its own
   // opt-in pref (Settings > Radio > Suppress dup).
   bool wantsOverhearSuppress() const override { return _prefs.client_repeat && _prefs.repeat_suppress_dup; }
+  // Adaptive Power Control is suppressed while repeating: a repeater wants full,
+  // consistent TX power for relay reach, and its feedback sources (own ACKs /
+  // own flood echoes) don't fire on forwarded traffic anyway. applyApc() then
+  // pins power to the ceiling.
+  bool apcActive() const { return _prefs.tx_apc && !_prefs.client_repeat; }
 
   void sendFloodScoped(const TransportKey& scope, mesh::Packet* pkt, uint32_t delay_millis);
   void sendFloodScoped(const ContactInfo& recipient, mesh::Packet* pkt, uint32_t delay_millis=0) override;

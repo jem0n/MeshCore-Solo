@@ -496,7 +496,7 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* packet) {
   // positive feedback on the repeater link — sample its SNR. This is the only
   // confirmation a channel send gets (no ACK), and is what lets APC recover power
   // after it has trimmed too far for the repeaters to hear.
-  if (_prefs.tx_apc && _apc_flood_pending && packet->payload_len == _apc_flood_len) {
+  if (apcActive() && _apc_flood_pending && packet->payload_len == _apc_flood_len) {
     uint8_t h[MAX_HASH_SIZE];
     packet->calculatePacketHash(h);
     if (memcmp(h, _apc_flood_hash, MAX_HASH_SIZE) == 0) {
@@ -596,7 +596,7 @@ void MyMesh::sendFloodScoped(const ContactInfo& recipient, mesh::Packet* pkt, ui
 }
 void MyMesh::sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t delay_millis) {
   // TODO: have per-channel send_scope
-  if (_prefs.tx_apc) apcTrackFloodSend(pkt);   // listen for a repeater echo to drive APC (channels have no ACK)
+  if (apcActive()) apcTrackFloodSend(pkt);   // listen for a repeater echo to drive APC (channels have no ACK)
   trackRelaySend(pkt);                          // and for the UI "relayed" marker
   if (send_unscoped) {
     sendFlood(pkt, delay_millis, _prefs.path_hash_mode + 1);  // app has explicitly requested un-scoped
@@ -1241,7 +1241,7 @@ void MyMesh::trackRelaySend(const mesh::Packet* pkt) {
 }
 
 void MyMesh::onSendTimeout() {
-  if (_prefs.tx_apc) apcOnFailure();
+  if (apcActive()) apcOnFailure();
 }
 
 void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
@@ -1250,7 +1250,7 @@ void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
   // Capture the match before the base handler's processAck() clears the entry.
   bool mine = isAckPending(ack_crc);
   BaseChatMesh::onAckRecv(packet, ack_crc);
-  if (mine && _prefs.tx_apc) apcSampleSnr(radio_driver.getLastSNR());
+  if (mine && apcActive()) apcSampleSnr(radio_driver.getLastSNR());
   // Drive the DM delivery-status marker. Note isAckPending() only covers
   // app/serial-initiated sends (expected_ack_table); a DM composed on the
   // device UI registers in BaseChatMesh's own ack table instead, so gating on
@@ -1861,9 +1861,11 @@ void MyMesh::handleCmdFrame(size_t len) {
       savePrefs();
 
       radio_driver.setParams(_prefs.freq, _prefs.bw, _prefs.sf, _prefs.cr);
-      // Keep the "repeating ⇒ continuous RX" invariant when repeat is toggled via
-      // the app, mirroring the on-device path (a repeater must hear all traffic).
+      // Keep the "repeating ⇒ continuous RX, full TX power" invariants when repeat
+      // is toggled via the app, mirroring the on-device path (a repeater must hear
+      // all traffic and relay at consistent power).
       radio_driver.setPowerSaving(_prefs.rx_powersave && !_prefs.client_repeat);
+      applyApc();   // pins power to the ceiling; apcActive() keeps it there while repeating
       MESH_DEBUG_PRINTLN("OK: CMD_SET_RADIO_PARAMS: f=%d, bw=%d, sf=%d, cr=%d", freq, bw, (uint32_t)sf,
                          (uint32_t)cr);
 
@@ -2774,7 +2776,7 @@ void MyMesh::loop() {
   // treated as a lost confirmation → ramp power up (lets channel sends recover).
   if (_apc_flood_pending && millisHasNowPassed(_apc_flood_deadline)) {
     _apc_flood_pending = false;
-    if (_prefs.tx_apc) apcOnFailure();
+    if (apcActive()) apcOnFailure();
   }
   // UI relay windows expired with no echo — just drop them (no echo is not a
   // failure for channels; the marker simply stays "sent").

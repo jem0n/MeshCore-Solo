@@ -260,6 +260,7 @@ public:
       p->client_repeat ^= 1;
       the_mesh.applyRepeaterRadio();   // switch to profile on enable / restore companion on disable
       _task->applyPowerSave();         // duty-cycle RX is forced off while repeating
+      _task->applyApc();               // pin TX power to the ceiling while repeating (APC suppressed)
       buildItems(p);
       _dirty = true;
       return true;
