@@ -194,6 +194,31 @@ class NearbyScreen : public UIScreen {
     clampSelection();
   }
 
+  // Rebuild the stored list (re-merge live shares + re-sort) while keeping the
+  // currently highlighted node selected across the rebuild — by contact index
+  // for a stored node, or by name for a non-contact live sender. Returns false
+  // if that node is no longer in the list (caller decides whether to drop the
+  // detail/nav view). Shared by the list, detail and navigate refresh paths.
+  bool refreshKeepingSelection() {
+    int  saved_idx  = (_sel < _count) ? _entries[_sel].contact_idx : -1;
+    bool saved_live = (_sel < _count) && _entries[_sel].is_live && saved_idx < 0;
+    char saved_name[sizeof(_entries[0].name)]; saved_name[0] = '\0';
+    if (_sel < _count) {
+      strncpy(saved_name, _entries[_sel].name, sizeof(saved_name) - 1);
+      saved_name[sizeof(saved_name) - 1] = '\0';
+    }
+    refreshStored();
+    if (saved_idx >= 0) {
+      for (int i = 0; i < _count; i++)
+        if (_entries[i].contact_idx == saved_idx) { _sel = i; return true; }
+    } else if (saved_live && saved_name[0]) {
+      for (int i = 0; i < _count; i++)
+        if (_entries[i].is_live && strncmp(_entries[i].name, saved_name, sizeof(saved_name) - 1) == 0)
+          { _sel = i; return true; }
+    }
+    return false;
+  }
+
   // Overlay live [LOC] shares onto the stored list: refresh a matching contact
   // with the fresher shared position, and append senders who aren't contacts so
   // a group sharing on a channel still shows up. DM shares match by pubkey
@@ -586,24 +611,7 @@ public:
     unsigned long refresh_due = _nav ? NAV_REFRESH_MS : DETAIL_REFRESH_MS;
     if ((_detail || _nav) && _source == SRC_STORED &&
         millis() - _detail_refresh_ms >= refresh_due) {
-      int  saved_idx  = (_sel < _count) ? _entries[_sel].contact_idx : -1;
-      bool saved_live = (_sel < _count) && _entries[_sel].is_live && saved_idx < 0;
-      char saved_name[sizeof(_entries[0].name)]; saved_name[0] = '\0';
-      if (_sel < _count) {
-        strncpy(saved_name, _entries[_sel].name, sizeof(saved_name) - 1);
-        saved_name[sizeof(saved_name) - 1] = '\0';
-      }
-      refreshStored();
-      bool found = false;
-      if (saved_idx >= 0) {
-        for (int i = 0; i < _count; i++)
-          if (_entries[i].contact_idx == saved_idx) { _sel = i; found = true; break; }
-      } else if (saved_live && saved_name[0]) {
-        for (int i = 0; i < _count; i++)
-          if (_entries[i].is_live && strncmp(_entries[i].name, saved_name, sizeof(saved_name) - 1) == 0)
-            { _sel = i; found = true; break; }
-      }
-      if (!found) { _detail = false; _nav = false; }  // node/share gone — drop both views
+      if (!refreshKeepingSelection()) { _detail = false; _nav = false; }  // node/share gone
       _detail_refresh_ms = millis();
     }
 
@@ -628,9 +636,11 @@ public:
     if (_source == SRC_SCAN) {
       refreshScan();
       if (_scanning && millis() - _scan_started_ms >= SCAN_DURATION_MS) _scanning = false;
-    } else if (_sort == SORT_TIME && millis() - _list_refresh_ms >= TIME_LIST_REFRESH_MS) {
-      // re-sort periodically so newly-heard contacts bubble up
-      refreshStored();
+    } else if (millis() - _list_refresh_ms >= TIME_LIST_REFRESH_MS) {
+      // Re-merge + re-sort periodically so newly-heard contacts and fresh live
+      // [LOC] shares bubble to the right spot under either sort (distances move
+      // as you and they do, not just recency). Keep the highlighted node put.
+      refreshKeepingSelection();
       _list_refresh_ms = millis();
     }
 
