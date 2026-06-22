@@ -165,6 +165,38 @@ MINI_ICON(ICON_REPEATER, 6,   // » double chevron — relaying/forwarding (repe
   packRow(".#..#."),
   packRow("#..#.."));
 
+// Tools-menu glyphs (auto-reply bot, ringtone editor, diagnostics, system).
+MINI_ICON(ICON_BOT, 5,   // robot head: antenna + eyes + grille (auto-reply bot)
+  packRow("..#.."),
+  packRow("#####"),
+  packRow("#.#.#"),
+  packRow("#####"),
+  packRow("#.#.#"),
+  packRow("#####"));
+MINI_ICON(ICON_NOTE, 5,   // ♪ quaver — ringtone editor
+  packRow("...##"),
+  packRow("...##"),
+  packRow("...#."),
+  packRow("...#."),
+  packRow("...#."),
+  packRow("##.#."),
+  packRow("##..."));
+MINI_ICON(ICON_CHART, 5,   // ascending bars — diagnostics / stats
+  packRow("....#"),
+  packRow("..#.#"),
+  packRow("..#.#"),
+  packRow("#.#.#"),
+  packRow("#.#.#"),
+  packRow("#####"));
+MINI_ICON(ICON_GEAR, 7,   // ⚙ cog with hub hole — system
+  packRow("..#.#.."),
+  packRow(".#####."),
+  packRow("#######"),
+  packRow("###.###"),
+  packRow("#######"),
+  packRow(".#####."),
+  packRow("..#.#.."));
+
 // Trail-map markers — centred on a point (see miniIconDrawCentered) rather
 // than anchored to a text line.
 MINI_ICON(ICON_MAP_DOT, 3,        // ● filled trail point

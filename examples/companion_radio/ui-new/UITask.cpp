@@ -1373,6 +1373,7 @@ void UITask::gotoSettingsScreen() {
 }
 
 void UITask::gotoToolsScreen() {
+  ((ToolsScreen*)tools_screen)->enter();
   setCurrScreen(tools_screen);
 }
 
