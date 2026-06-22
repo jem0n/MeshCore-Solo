@@ -244,9 +244,14 @@ struct NodePrefs {  // persisted to file
   uint8_t  geo_alert_has_target;   // 0=no target chosen yet, 1=target set
   uint8_t  geo_alert_radius_idx;   // index into geoAlertRadiusMeters
   uint8_t  geo_alert_mode;         // 0=arrive, 1=leave, 2=both
-  int32_t  geo_alert_lat_1e6;      // target latitude  (1e6-scaled)
-  int32_t  geo_alert_lon_1e6;      // target longitude (1e6-scaled)
+  int32_t  geo_alert_lat_1e6;      // target latitude  (1e6-scaled; last-known for a contact)
+  int32_t  geo_alert_lon_1e6;      // target longitude (1e6-scaled; last-known for a contact)
   char     geo_alert_label[12];    // target name for the alert text (WAYPOINT_LABEL_LEN)
+  // Target can be a static waypoint or a live contact: for a contact the engine
+  // re-reads the latest [LOC] position each evaluation (keyed by pubkey prefix),
+  // so the geofence follows a moving person ("alert when my friend is near").
+  uint8_t  geo_alert_target_kind;  // 0=waypoint (static), 1=live contact
+  uint8_t  geo_alert_key[6];       // contact pubkey prefix when target_kind==1
 
   // Trail auto-pause — when tracking, automatically freeze the trail (timer +
   // sampling) after the device has sat still for this long, and resume on the
@@ -310,7 +315,7 @@ struct NodePrefs {  // persisted to file
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0014;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0015;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage

@@ -394,6 +394,10 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   // → 0xC0DE0014: geo-alert proximity beeper.
   rd(&_prefs.geo_alert_beeper, sizeof(_prefs.geo_alert_beeper));
   if (_prefs.geo_alert_beeper > 1) _prefs.geo_alert_beeper = 0;
+  // → 0xC0DE0015: geo-alert can target a live contact (kind + pubkey prefix).
+  rd(&_prefs.geo_alert_target_kind, sizeof(_prefs.geo_alert_target_kind));
+  rd(_prefs.geo_alert_key,          sizeof(_prefs.geo_alert_key));
+  if (_prefs.geo_alert_target_kind > 1) _prefs.geo_alert_target_kind = 0;
   // Pre-0x10 files leave stray sentinel bytes here, same as a never-configured
   // device. Either way there's no valid saved profile, so default to a profile
   // in the same band as the companion's own network (_prefs.freq, already read
@@ -590,6 +594,8 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)_prefs.geo_alert_label,       sizeof(_prefs.geo_alert_label));
     file.write((uint8_t *)&_prefs.trail_autopause_idx,  sizeof(_prefs.trail_autopause_idx));
     file.write((uint8_t *)&_prefs.geo_alert_beeper,     sizeof(_prefs.geo_alert_beeper));
+    file.write((uint8_t *)&_prefs.geo_alert_target_kind, sizeof(_prefs.geo_alert_target_kind));
+    file.write((uint8_t *)_prefs.geo_alert_key,         sizeof(_prefs.geo_alert_key));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

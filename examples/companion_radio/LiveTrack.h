@@ -78,6 +78,19 @@ public:
     return n;
   }
 
+  // Latest active position for a verified (DM/pubkey) share, or null if that
+  // node hasn't shared recently. Used by the geo-alert engine to follow a
+  // moving contact.
+  const Entry* activeByKey(const uint8_t* key, uint32_t now) const {
+    if (!key) return nullptr;
+    for (int i = 0; i < CAPACITY; i++) {
+      if (!isActive(i, now)) continue;
+      const Entry& e = _e[i];
+      if (e.verified && memcmp(e.key, key, KEY_LEN) == 0) return &e;
+    }
+    return nullptr;
+  }
+
 private:
   Entry _e[CAPACITY] = {};
 

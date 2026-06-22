@@ -179,6 +179,7 @@ public:
   void gotoQuickMsgScreen();
   void openContactDM(const ContactInfo& ci);
   void shareToMessage(const char* text);   // open Messages pre-loaded to share `text`
+  void quickShareMyLocation();             // Home Map Hold-Enter: one-shot position share
   void pickLocShareTarget();               // open Messages to choose the live-share target
   int  getRecentDMContacts(uint8_t out[][NodePrefs::FAVOURITE_PREFIX_LEN], int max) const;
   void gotoToolsScreen();

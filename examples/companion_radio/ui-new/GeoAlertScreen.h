@@ -9,6 +9,7 @@
 
 #include "../NodePrefs.h"
 #include "../Waypoint.h"
+#include "../LiveTrack.h"
 #include "icons.h"   // drawList (shared scrolling-list helper)
 
 class GeoAlertScreen : public UIScreen {
@@ -43,12 +44,14 @@ public:
         snprintf(buf, n, "%s", (_prefs && _prefs->geo_alert_enabled) ? "ON" : "OFF");
         break;
       case K_TARGET:
-        if (_prefs && _prefs->geo_alert_has_target && _prefs->geo_alert_label[0])
-          snprintf(buf, n, "%s", _prefs->geo_alert_label);
-        else if (_prefs && _prefs->geo_alert_has_target)
-          snprintf(buf, n, "(unnamed)");
-        else
+        if (_prefs && _prefs->geo_alert_has_target) {
+          const char* nm = _prefs->geo_alert_label[0] ? _prefs->geo_alert_label : "(unnamed)";
+          // '@' prefix marks a live contact target (a moving person) vs a waypoint.
+          if (_prefs->geo_alert_target_kind == 1) snprintf(buf, n, "@%s", nm);
+          else                                    snprintf(buf, n, "%s", nm);
+        } else {
           snprintf(buf, n, "none");
+        }
         break;
       case K_RADIUS: {
         uint16_t r = NodePrefs::geoAlertRadiusMeters(_prefs ? _prefs->geo_alert_radius_idx : 1);
@@ -118,27 +121,48 @@ public:
     _task->resetGeoAlert();
   }
 
-  // Cycle the target through the saved waypoints, snapshotting the chosen one's
-  // coordinate + label into prefs so the alert is independent of later edits.
+  // Cycle the target through saved waypoints (static) and verified live contacts
+  // (a person sharing [LOC] over a DM), snapshotting the chosen one into prefs.
+  // A waypoint stores coord+label; a contact stores the pubkey prefix so the
+  // engine can follow its live position, plus the name and last-known coord.
   void cycleTarget(int dir) {
-    WaypointStore& wp = _task->waypoints();
-    int total = wp.count();
-    if (total == 0) { _task->showAlert("Mark a waypoint first", 1400); return; }
+    WaypointStore&  wp = _task->waypoints();
+    LiveTrackStore& lt = _task->liveTrack();
+    uint32_t now = rtc_clock.getCurrentTime();
 
-    // Locate the current target among the waypoints (by coordinate match).
+    struct T { uint8_t kind; int idx; };  // kind 0=waypoint, 1=live contact (slot)
+    T list[32]; int n = 0;
+    for (int i = 0; i < wp.count() && n < 32; i++) list[n++] = { 0, i };
+    for (int i = 0; i < LiveTrackStore::CAPACITY && n < 32; i++)
+      if (lt.isActive(i, now) && lt.slotAt(i).verified) list[n++] = { 1, i };
+    if (n == 0) { _task->showAlert("No waypoints / live", 1400); return; }
+
+    // Locate the current target in the combined list.
     int cur = -1;
-    if (_prefs->geo_alert_has_target) {
-      for (int i = 0; i < total; i++)
-        if (wp.at(i).lat_1e6 == _prefs->geo_alert_lat_1e6 &&
-            wp.at(i).lon_1e6 == _prefs->geo_alert_lon_1e6) { cur = i; break; }
+    for (int i = 0; i < n; i++) {
+      if (list[i].kind == 0 && _prefs->geo_alert_target_kind == 0) {
+        const Waypoint& w = wp.at(list[i].idx);
+        if (w.lat_1e6 == _prefs->geo_alert_lat_1e6 && w.lon_1e6 == _prefs->geo_alert_lon_1e6) { cur = i; break; }
+      } else if (list[i].kind == 1 && _prefs->geo_alert_target_kind == 1) {
+        if (memcmp(lt.slotAt(list[i].idx).key, _prefs->geo_alert_key, LiveTrackStore::KEY_LEN) == 0) { cur = i; break; }
+      }
     }
-    int nx = (cur < 0) ? (dir >= 0 ? 0 : total - 1)
-                       : ((cur + (dir >= 0 ? 1 : total - 1)) % total);
+    int nx = (cur < 0) ? (dir >= 0 ? 0 : n - 1) : ((cur + (dir >= 0 ? 1 : n - 1)) % n);
 
-    const Waypoint& w = wp.at(nx);
-    _prefs->geo_alert_lat_1e6 = w.lat_1e6;
-    _prefs->geo_alert_lon_1e6 = w.lon_1e6;
-    snprintf(_prefs->geo_alert_label, sizeof(_prefs->geo_alert_label), "%s", w.label);
+    if (list[nx].kind == 0) {
+      const Waypoint& w = wp.at(list[nx].idx);
+      _prefs->geo_alert_target_kind = 0;
+      _prefs->geo_alert_lat_1e6 = w.lat_1e6;
+      _prefs->geo_alert_lon_1e6 = w.lon_1e6;
+      snprintf(_prefs->geo_alert_label, sizeof(_prefs->geo_alert_label), "%s", w.label);
+    } else {
+      const LiveTrackStore::Entry& e = lt.slotAt(list[nx].idx);
+      _prefs->geo_alert_target_kind = 1;
+      memcpy(_prefs->geo_alert_key, e.key, LiveTrackStore::KEY_LEN);
+      _prefs->geo_alert_lat_1e6 = e.lat_1e6;
+      _prefs->geo_alert_lon_1e6 = e.lon_1e6;
+      snprintf(_prefs->geo_alert_label, sizeof(_prefs->geo_alert_label), "%s", e.name);
+    }
     _prefs->geo_alert_has_target = 1;
     _dirty = true;
   }

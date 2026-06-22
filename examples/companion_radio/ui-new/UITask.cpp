@@ -1225,6 +1225,10 @@ public:
       _task->gotoDashboardConfig();
       return true;
     }
+    if (c == KEY_CONTEXT_MENU && _page == HomePage::MAP) {
+      _task->quickShareMyLocation();
+      return true;
+    }
     return false;
   }
 };
@@ -2129,10 +2133,20 @@ void UITask::loop() {
 // evaluator and the proximity beeper.
 bool UITask::geoAlertDistance(float& dist_m, float& radius_m) const {
   if (!_node_prefs || !_node_prefs->geo_alert_has_target) return false;
+  int32_t tlat, tlon;
+  if (_node_prefs->geo_alert_target_kind == 1) {
+    // Live contact: follow the latest [LOC] position. No recent share → no
+    // distance to evaluate (engine waits rather than using a stale fix).
+    const LiveTrackStore::Entry* e =
+        _livetrack.activeByKey(_node_prefs->geo_alert_key, (uint32_t)rtc_clock.getCurrentTime());
+    if (!e) return false;
+    tlat = e->lat_1e6; tlon = e->lon_1e6;
+  } else {
+    tlat = _node_prefs->geo_alert_lat_1e6; tlon = _node_prefs->geo_alert_lon_1e6;
+  }
   int32_t lat, lon;
   if (!currentLocation(lat, lon)) return false;
-  dist_m   = geo::haversineKm(lat, lon, _node_prefs->geo_alert_lat_1e6,
-                              _node_prefs->geo_alert_lon_1e6) * 1000.0f;
+  dist_m   = geo::haversineKm(lat, lon, tlat, tlon) * 1000.0f;
   radius_m = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
   return true;
 }
@@ -2160,8 +2174,12 @@ void UITask::evaluateGeoAlert() {
 
 void UITask::fireGeoAlert(bool arrived) {
   const char* lbl = _node_prefs->geo_alert_label[0] ? _node_prefs->geo_alert_label : "target";
+  bool person = _node_prefs->geo_alert_target_kind == 1;
   char msg[40];
-  snprintf(msg, sizeof(msg), arrived ? "Arrived: %s" : "Left: %s", lbl);
+  // "Near/Away" reads naturally for a moving person; "Arrived/Left" for a place.
+  snprintf(msg, sizeof(msg),
+           arrived ? (person ? "Near: %s"  : "Arrived: %s")
+                   : (person ? "Away: %s"  : "Left: %s"), lbl);
   showAlert(msg, 3000);
   if (!isBuzzerQuiet())
     playMelody(arrived ? "geoarr:d=8,o=6,b=140:c,e,g" : "geolv:d=8,o=6,b=140:g,e,c");
@@ -2275,6 +2293,22 @@ bool UITask::sendLocationShare(int32_t lat, int32_t lon) {
   if (!c) return false;
   uint32_t expected_ack = 0, est_timeout = 0;
   return the_mesh.sendMessage(*c, rtc_clock.getCurrentTime(), 0, text, expected_ack, est_timeout) > 0;
+}
+
+// One-shot "share my position" from the home Map page (Hold Enter). When live
+// sharing is already on, push an immediate [LOC] to the same target; otherwise
+// hand a [LOC] message to the recipient picker so the user chooses where it
+// goes (no accidental broadcast to a default channel).
+void UITask::quickShareMyLocation() {
+  int32_t lat, lon;
+  if (!currentLocation(lat, lon)) { showAlert("No GPS fix", 1000); return; }
+  if (_node_prefs && _node_prefs->loc_share_enabled && sendLocationShare(lat, lon)) {
+    showAlert("Position shared", 900);
+    return;
+  }
+  char text[40];
+  snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
+  shareToMessage(text);
 }
 
 void UITask::saveWaypoints() {
