@@ -39,7 +39,7 @@ class TrailScreen : public UIScreen {
   // (Start/Stop tracking, Reset). PopupMenu stores label pointers verbatim, so
   // the labels live in member buffers that get refreshed in openActionMenu()
   // and after every LEFT/RIGHT cycle.
-  enum ActionId { ACT_MIN_DIST, ACT_UNITS, ACT_GRID, ACT_TOGGLE, ACT_SAVE, ACT_LOAD, ACT_RESET, ACT_EXPORT, ACT_EXPORT_SAVED, ACT_MARK, ACT_WAYPOINTS, ACT_FILE, ACT_SETTINGS,
+  enum ActionId { ACT_MIN_DIST, ACT_UNITS, ACT_GRID, ACT_AUTOPAUSE, ACT_TOGGLE, ACT_SAVE, ACT_LOAD, ACT_RESET, ACT_EXPORT, ACT_EXPORT_SAVED, ACT_MARK, ACT_WAYPOINTS, ACT_FILE, ACT_SETTINGS,
                  ACT_SHARE_NOW };
   // The action popup is multi-level: a short main menu, plus "Trail file…" and
   // "Settings…" submenus. _menu_level tracks which is open so input is routed
@@ -54,6 +54,7 @@ class TrailScreen : public UIScreen {
   char      _act_min_dist_label[24];
   char      _act_units_label[24];
   char      _act_grid_label[16];
+  char      _act_autopause_label[24];
   char      _act_toggle_label[20];
 
   static const int SUMMARY_ITEM_COUNT = 5;
@@ -126,7 +127,8 @@ public:
           // Settings rows: Enter advances/toggles the value and keeps focus.
           case ACT_MIN_DIST:
           case ACT_UNITS:
-          case ACT_GRID:     cycleSetting(act, 1); reopenSettingsAt(sel); return true;
+          case ACT_GRID:
+          case ACT_AUTOPAUSE: cycleSetting(act, 1); reopenSettingsAt(sel); return true;
           case ACT_SHARE_NOW:     shareMyLocationNow(); break;
           case ACT_TOGGLE:        handleToggle();      break;
           case ACT_MARK:          _wp.markHere();      break;
@@ -259,6 +261,8 @@ private:
               "Readout: %s",  (p && p->trail_show_pace) ? "Pace" : "Speed");
     snprintf(_act_grid_label,   sizeof(_act_grid_label),
               "Grid: %s",      _map_grid ? "ON" : "OFF");
+    snprintf(_act_autopause_label, sizeof(_act_autopause_label),
+              "Auto-pause: %s", NodePrefs::trailAutoPauseLabel(p ? p->trail_autopause_idx : 0));
     snprintf(_act_toggle_label, sizeof(_act_toggle_label),
               "%s tracking",  _store->isActive() ? "Stop" : "Start");
   }
@@ -310,8 +314,9 @@ private:
     refreshActionLabels();
     _menu_level = ML_SETTINGS;
     _act_count  = 0;
-    _action_menu.begin("Settings", 3);
-    pushAction(ACT_MIN_DIST, _act_min_dist_label);
+    _action_menu.begin("Settings", 4);
+    pushAction(ACT_MIN_DIST,  _act_min_dist_label);
+    pushAction(ACT_AUTOPAUSE, _act_autopause_label);
     if (_view == V_SUMMARY) pushAction(ACT_UNITS, _act_units_label);
     if (_view == V_MAP)     pushAction(ACT_GRID,  _act_grid_label);
   }
@@ -322,6 +327,7 @@ private:
     if (act == ACT_MIN_DIST && p) { cycleMinDelta(p, dir); _cfg_dirty = true; refreshActionLabels(); return true; }
     if (act == ACT_UNITS    && p) { cycleUnits(p, dir);    _cfg_dirty = true; refreshActionLabels(); return true; }
     if (act == ACT_GRID)          { _map_grid = !_map_grid;                    refreshActionLabels(); return true; }
+    if (act == ACT_AUTOPAUSE && p){ cycleAutoPause(p, dir); _cfg_dirty = true; refreshActionLabels(); return true; }
     return false;
   }
 
@@ -357,6 +363,13 @@ private:
   // The trail "Readout" row toggles speed vs pace; the metric/imperial unit
   // comes from the global Settings preference, so this is a plain on/off flip.
   void cycleUnits(NodePrefs* p, int /*dir*/) { p->trail_show_pace ^= 1; }
+  void cycleAutoPause(NodePrefs* p, int dir) {
+    uint8_t idx = p->trail_autopause_idx;
+    if (idx >= NodePrefs::TRAIL_AUTOPAUSE_COUNT) idx = 0;
+    idx = (dir > 0) ? (idx + 1) % NodePrefs::TRAIL_AUTOPAUSE_COUNT
+                    : (idx + NodePrefs::TRAIL_AUTOPAUSE_COUNT - 1) % NodePrefs::TRAIL_AUTOPAUSE_COUNT;
+    p->trail_autopause_idx = idx;
+  }
 
   // One-shot manual share: build "[LOC]lat,lon" and hand it to the Messages
   // screen, where the user picks a DM or channel recipient. (Auto live-share
@@ -398,6 +411,7 @@ private:
       case 0: {
         const char* st;
         if (!_store->isActive())     st = "stopped";
+        else if (_store->isPaused()) st = "paused";
         else if (_store->empty())    st = "waiting fix";
         else                          st = "tracking";
         snprintf(buf, n, "Status: %s", st);

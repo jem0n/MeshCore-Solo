@@ -235,6 +235,30 @@ struct NodePrefs {  // persisted to file
   uint8_t  loc_share_interval_idx;  // min send interval (index into locShareIntervalSecs)
   uint8_t  loc_share_heartbeat_idx; // stationary heartbeat (index into locShareHeartbeatSecs)
 
+  // Geo-alert — a single geofence around a saved point. When enabled the device
+  // watches its own GPS fix and beeps + shows an alert when it crosses into
+  // (arrive) or out of (leave) the radius. The target coordinate/label is a
+  // snapshot of a chosen waypoint, so the alert survives the waypoint being
+  // edited or deleted. Configured from Tools › Geo Alert.
+  uint8_t  geo_alert_enabled;      // 0=off (default), 1=armed
+  uint8_t  geo_alert_has_target;   // 0=no target chosen yet, 1=target set
+  uint8_t  geo_alert_radius_idx;   // index into geoAlertRadiusMeters
+  uint8_t  geo_alert_mode;         // 0=arrive, 1=leave, 2=both
+  int32_t  geo_alert_lat_1e6;      // target latitude  (1e6-scaled)
+  int32_t  geo_alert_lon_1e6;      // target longitude (1e6-scaled)
+  char     geo_alert_label[12];    // target name for the alert text (WAYPOINT_LABEL_LEN)
+
+  // Trail auto-pause — when tracking, automatically freeze the trail (timer +
+  // sampling) after the device has sat still for this long, and resume on the
+  // next real movement. 0 = off. Index into trailAutoPauseSecs.
+  uint8_t  trail_autopause_idx;
+
+  // Geo-alert proximity beeper — when on (and the alert is armed with a target),
+  // the device ticks while inside the radius and shortens the gap between ticks
+  // the closer it gets to the target, like a homing beeper. Independent of the
+  // discrete arrive/leave alert (geo_alert_mode).
+  uint8_t  geo_alert_beeper;       // 0=off (default), 1=on
+
   // Single source of truth for the live-share option tables (shared by the Map
   // UI labels and the auto-send engine in UITask).
   static const uint8_t LOC_SHARE_MOVE_COUNT = 4;
@@ -253,11 +277,35 @@ struct NodePrefs {  // persisted to file
     return H[idx < LOC_SHARE_HEARTBEAT_COUNT ? idx : 0];
   }
 
+  // Geo-alert option tables (shared by the Tools › Geo Alert UI labels and the
+  // evaluation engine in UITask).
+  static const uint8_t GEO_ALERT_RADIUS_COUNT = 5;
+  static uint16_t geoAlertRadiusMeters(uint8_t idx) {
+    static const uint16_t R[GEO_ALERT_RADIUS_COUNT] = { 50, 100, 250, 500, 1000 };
+    return R[idx < GEO_ALERT_RADIUS_COUNT ? idx : 1];
+  }
+  static const uint8_t GEO_ALERT_MODE_COUNT = 3;  // 0=arrive, 1=leave, 2=both
+  static const char* geoAlertModeLabel(uint8_t m) {
+    static const char* L[GEO_ALERT_MODE_COUNT] = { "Arrive", "Leave", "Both" };
+    return L[m < GEO_ALERT_MODE_COUNT ? m : 0];
+  }
+
+  // Trail auto-pause delays (seconds). 0 = off.
+  static const uint8_t TRAIL_AUTOPAUSE_COUNT = 4;
+  static uint16_t trailAutoPauseSecs(uint8_t idx) {
+    static const uint16_t S[TRAIL_AUTOPAUSE_COUNT] = { 0, 60, 120, 300 };  // off / 1 / 2 / 5 min
+    return S[idx < TRAIL_AUTOPAUSE_COUNT ? idx : 0];
+  }
+  static const char* trailAutoPauseLabel(uint8_t idx) {
+    static const char* L[TRAIL_AUTOPAUSE_COUNT] = { "Off", "1m", "2m", "5m" };
+    return L[idx < TRAIL_AUTOPAUSE_COUNT ? idx : 0];
+  }
+
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0012;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0014;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage

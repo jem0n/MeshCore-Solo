@@ -73,6 +73,7 @@ public:
     if (a && !_active) {
       // off → on: start a new session timer.
       _session_start_ms = millis();
+      _paused = false;
     } else if (_active && !a) {
       // on → off: bank the elapsed of this session and arm a segment break
       // so the renderer doesn't draw a straight line through the dead time.
@@ -81,8 +82,29 @@ public:
         _session_start_ms  = 0;
       }
       _pending_seg_break = true;
+      _paused = false;
     }
     _active = a;
+  }
+
+  // Auto-pause: freeze the active trail without ending the session. Banks the
+  // running session time (so elapsedSeconds() stops advancing) and arms a
+  // segment break so the map doesn't draw a line across the idle gap; resuming
+  // restarts the session timer. Distinct from setActive() — the trail stays
+  // "on" (UI shows "paused", home-screen blink keeps going). No-op if inactive.
+  bool isPaused() const { return _paused; }
+  void setPaused(bool p) {
+    if (!_active || p == _paused) return;
+    if (p) {
+      if (_session_start_ms != 0) {
+        _accumulated_ms  += millis() - _session_start_ms;
+        _session_start_ms = 0;
+      }
+      _pending_seg_break = true;
+    } else {
+      _session_start_ms = millis();  // resume timing from now
+    }
+    _paused = p;
   }
 
   int  count() const { return _count; }
@@ -98,6 +120,7 @@ public:
     _pending_seg_break = false;
     _accumulated_ms    = 0;
     _session_start_ms  = 0;
+    _paused            = false;
   }
 
   // Returns true if the point was stored (passed the min-delta gate).
@@ -202,6 +225,7 @@ public:
       _active = false;
       _session_start_ms = 0;
     }
+    _paused = false;
     _head = 0;
     _count = 0;
     for (int i = 0; i < cnt; i++) {
@@ -367,6 +391,7 @@ private:
   int      _head             = 0;
   int      _count            = 0;
   bool     _active           = false;
+  bool     _paused           = false;  // auto-paused (active but timer/sampling frozen)
   bool     _pending_seg_break = false;  // next addPoint flags itself SEG_START
   uint32_t _accumulated_ms   = 0;       // banked active time across previous sessions
   uint32_t _session_start_ms = 0;       // millis() of the current active session, 0 if none

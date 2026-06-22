@@ -124,6 +124,7 @@ static const int QUICK_MSGS_MAX = 10;
 #include "DashboardConfigScreen.h"
 #include "AutoAdvertScreen.h"
 #include "LiveShareScreen.h"
+#include "GeoAlertScreen.h"
 #include "TrailScreen.h"
 #include "CompassScreen.h"
 #include "DiagnosticsScreen.h"
@@ -1294,6 +1295,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   dashboard_config = new DashboardConfigScreen(this, node_prefs);
   auto_advert_screen = new AutoAdvertScreen(this, node_prefs);
   live_share_screen = new LiveShareScreen(this, node_prefs);
+  geo_alert_screen  = new GeoAlertScreen(this, node_prefs);
   trail_screen       = new TrailScreen(this, &_trail);
   compass_screen     = new CompassScreen(this);
   diag_screen        = new DiagnosticsScreen(this);
@@ -1361,6 +1363,11 @@ void UITask::gotoRepeaterScreen() {
 void UITask::gotoLiveShareScreen() {
   ((LiveShareScreen*)live_share_screen)->enter();
   setCurrScreen(live_share_screen);
+}
+
+void UITask::gotoGeoAlertScreen() {
+  ((GeoAlertScreen*)geo_alert_screen)->enter();
+  setCurrScreen(geo_alert_screen);
 }
 
 void UITask::gotoAutoAdvertScreen() {
@@ -2015,16 +2022,37 @@ void UITask::loop() {
   // GPS trail sampling — runs in the background while the trail is
   // active, independent of which screen is shown. Skips silently if no GPS
   // fix; min-delta gate inside addPoint() avoids near-stationary spam.
+  if (!_trail.isActive()) _trail_pause_has_ref = false;   // fresh ref on next start
   if (_trail.isActive() && _node_prefs != NULL
       && (int32_t)(millis() - _next_trail_sample_ms) >= 0) {
     _next_trail_sample_ms = millis() + (uint32_t)TrailStore::SAMPLING_SECS * 1000UL;
     LocationProvider* loc = _sensors ? _sensors->getLocationProvider() : nullptr;
     if (loc && loc->isValid()) {
+      int32_t la = (int32_t)loc->getLatitude();
+      int32_t lo = (int32_t)loc->getLongitude();
       uint16_t md = TrailStore::minDeltaMeters(_node_prefs->trail_min_delta_idx,
                                                 _node_prefs->units_imperial);
-      _trail.addPoint((int32_t)loc->getLatitude(),
-                      (int32_t)loc->getLongitude(),
-                      (uint32_t)rtc_clock.getCurrentTime(), md);
+      // Auto-pause: freeze the trail once the device has sat within the
+      // min-delta gate for the configured delay; resume on the next real move.
+      uint16_t ap = NodePrefs::trailAutoPauseSecs(_node_prefs->trail_autopause_idx);
+      if (ap > 0) {
+        uint32_t now = millis();
+        float moved = _trail_pause_has_ref
+            ? geo::haversineKm(_trail_pause_ref_lat, _trail_pause_ref_lon, la, lo) * 1000.0f
+            : 1e9f;
+        if (!_trail_pause_has_ref || moved >= (float)md) {
+          _trail_pause_ref_lat = la; _trail_pause_ref_lon = lo;
+          _trail_pause_has_ref = true;
+          _trail_last_move_ms  = now;
+          if (_trail.isPaused()) _trail.setPaused(false);
+        } else if (!_trail.isPaused() && (now - _trail_last_move_ms) >= (uint32_t)ap * 1000UL) {
+          _trail.setPaused(true);
+        }
+      } else if (_trail.isPaused()) {
+        _trail.setPaused(false);   // feature turned off → resume
+      }
+      if (!_trail.isPaused())
+        _trail.addPoint(la, lo, (uint32_t)rtc_clock.getCurrentTime(), md);
     }
   }
 
@@ -2076,6 +2104,87 @@ void UITask::loop() {
       pushCogFix((int32_t)loc->getLatitude(), (int32_t)loc->getLongitude());
     }
   }
+
+  // Geo-alert — beep + alert when the device crosses into / out of the armed
+  // geofence. Cheap; a few seconds of latency at the boundary is fine.
+  if ((int32_t)(millis() - _next_geo_alert_ms) >= 0) {
+    _next_geo_alert_ms = millis() + 3000UL;
+    evaluateGeoAlert();
+  }
+
+  // Geo-alert proximity beeper — ticks faster the closer to the target. Runs on
+  // its own short cadence (the crossing check above is too coarse for this).
+  geoProximityBeeper();
+}
+
+// Evaluate the single geofence against the current GPS fix. Crossing the radius
+// fires fireGeoAlert() according to the configured mode; a hysteresis band on
+// the "leave" edge stops it chattering at the boundary, and the first reading
+// after arming only seeds the inside/outside state (no spurious alert).
+void UITask::evaluateGeoAlert() {
+  if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_has_target) {
+    _geo_alert_known = false;
+    return;
+  }
+  int32_t lat, lon;
+  if (!currentLocation(lat, lon)) return;
+  float dist = geo::haversineKm(lat, lon,
+                                _node_prefs->geo_alert_lat_1e6,
+                                _node_prefs->geo_alert_lon_1e6) * 1000.0f;
+  float r = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  bool inside;
+  if (!_geo_alert_known)        inside = dist <= r;            // seed state
+  else if (_geo_alert_inside)   inside = dist <= r * 1.25f;    // leave past band
+  else                          inside = dist <= r;            // arrive at edge
+
+  if (_geo_alert_known && inside != _geo_alert_inside) {
+    uint8_t mode = _node_prefs->geo_alert_mode;  // 0=arrive,1=leave,2=both
+    bool fire = inside ? (mode == 0 || mode == 2) : (mode == 1 || mode == 2);
+    if (fire) fireGeoAlert(inside);
+  }
+  _geo_alert_inside = inside;
+  _geo_alert_known  = true;
+}
+
+void UITask::fireGeoAlert(bool arrived) {
+  const char* lbl = _node_prefs->geo_alert_label[0] ? _node_prefs->geo_alert_label : "target";
+  char msg[40];
+  snprintf(msg, sizeof(msg), arrived ? "Arrived: %s" : "Left: %s", lbl);
+  showAlert(msg, 3000);
+  if (!isBuzzerQuiet())
+    playMelody(arrived ? "geoarr:d=8,o=6,b=140:c,e,g" : "geolv:d=8,o=6,b=140:g,e,c");
+}
+
+// Homing beeper: while armed with a target and inside the radius, emit a short
+// tick whose interval shrinks linearly with distance — slow at the edge, rapid
+// near the centre. Polls distance a few times a second; silent outside the
+// radius and when the buzzer is muted.
+void UITask::geoProximityBeeper() {
+  static const uint32_t BEEP_MIN_MS = 150;    // fastest cadence (at the target)
+  static const uint32_t BEEP_MAX_MS = 2000;   // slowest cadence (at the edge)
+  if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_beeper
+      || !_node_prefs->geo_alert_has_target || isBuzzerQuiet()) {
+    return;
+  }
+  if ((int32_t)(millis() - _geo_beep_check_ms) < 0) return;
+  _geo_beep_check_ms = millis() + 250UL;
+
+  int32_t lat, lon;
+  if (!currentLocation(lat, lon)) return;
+  float dist = geo::haversineKm(lat, lon,
+                                _node_prefs->geo_alert_lat_1e6,
+                                _node_prefs->geo_alert_lon_1e6) * 1000.0f;
+  float r = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  if (dist > r) {                       // outside the zone: stay quiet, beep on re-entry
+    _geo_beep_next_ms = millis();
+    return;
+  }
+  if ((int32_t)(millis() - _geo_beep_next_ms) < 0) return;
+  float frac = (r > 0) ? dist / r : 0;  // 0 at centre, 1 at edge
+  if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
+  uint32_t interval = BEEP_MIN_MS + (uint32_t)(frac * (BEEP_MAX_MS - BEEP_MIN_MS));
+  playMelody("geop:d=32,o=7,b=200:c");
+  _geo_beep_next_ms = millis() + interval;
 }
 
 // Insert a GPS fix into the course-over-ground ring, rejecting gross outliers

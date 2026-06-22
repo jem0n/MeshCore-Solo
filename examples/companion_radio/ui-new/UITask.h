@@ -79,6 +79,7 @@ class UITask : public AbstractUITask {
   UIScreen* dashboard_config;
   UIScreen* auto_advert_screen;
   UIScreen* live_share_screen;
+  UIScreen* geo_alert_screen;
   UIScreen* trail_screen;
   UIScreen* compass_screen;
   UIScreen* diag_screen;
@@ -97,6 +98,27 @@ class UITask : public AbstractUITask {
   int32_t  _loc_share_last_lat = 0, _loc_share_last_lon = 0;
   bool     _loc_share_has_last = false;
   bool     _loc_share_was_enabled = false;
+
+  // Trail auto-pause engine state. _trail_pause_ref is the last position the
+  // device was considered "at"; if it doesn't move beyond the trail min-delta
+  // gate for the configured delay, the trail is auto-paused.
+  int32_t  _trail_pause_ref_lat = 0, _trail_pause_ref_lon = 0;
+  bool     _trail_pause_has_ref = false;
+  uint32_t _trail_last_move_ms = 0;
+
+  // Geo-alert engine state. _geo_alert_known guards the first evaluation after
+  // arming (initialise inside/outside silently, fire only on later crossings).
+  uint32_t _next_geo_alert_ms = 0;
+  bool     _geo_alert_inside = false;
+  bool     _geo_alert_known = false;
+  // Proximity beeper: ticks while inside the radius, faster the nearer the
+  // target. _geo_beep_check_ms throttles the distance poll; _geo_beep_next_ms
+  // is when the next tick is due.
+  uint32_t _geo_beep_check_ms = 0;
+  uint32_t _geo_beep_next_ms = 0;
+  void evaluateGeoAlert();
+  void fireGeoAlert(bool arrived);
+  void geoProximityBeeper();
 
   // Course-over-ground ring — a heading source independent of trail recording.
   // Filled from the same periodic GPS poll regardless of _trail.isActive().
@@ -165,6 +187,11 @@ public:
   void gotoDashboardConfig();
   void gotoAutoAdvertScreen();
   void gotoLiveShareScreen();
+  void gotoGeoAlertScreen();
+  // Re-arm the geo-alert state machine so the next evaluation initialises
+  // silently (called by the Geo Alert tool after the target/radius changes,
+  // so re-entering the zone doesn't fire on a stale inside/outside state).
+  void resetGeoAlert() { _geo_alert_known = false; }
   void gotoTrailScreen();
   void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();
