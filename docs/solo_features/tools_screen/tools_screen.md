@@ -139,7 +139,7 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
 
 **Adding by coordinates** — open **Hold Enter → Waypoints** and select the **+ Add by coords** row (always the last entry in the list). This creates a waypoint without being there — no GPS fix required (handy for a meeting point or a spot read off a map). It opens a small form with three editable rows plus **Save**:
 
-- **Lat** / **Lon** — **Enter** opens the keyboard to type the value in decimal degrees (magnitude only; the keyboard has no minus sign), and **LEFT/RIGHT** toggles the hemisphere — N/S for latitude, E/W for longitude.
+- **Lat** / **Lon** — **Enter** opens the digit-by-digit scroll editor (the same widget as the radio frequency field): **LEFT/RIGHT** move the cursor between decimal places, **UP/DOWN** change the digit under it, **Enter** confirms. With the editor closed, **LEFT/RIGHT** on the row toggles the hemisphere — N/S for latitude, E/W for longitude.
 - **Label** — **Enter** to type a name (blank → auto `WP<n>`).
 - **Save** — validates the range and stores the waypoint. Missing or out-of-range values report a brief error.
 
