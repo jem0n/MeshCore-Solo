@@ -579,18 +579,9 @@ private:
     const int wp_x_max = area_x + area_w - 1, wp_y_max = area_y + area_h - 1;
     // Reserved rectangles of labels already placed this frame, so a dense
     // cluster of points doesn't smear their labels on top of one another.
+    // Live-tracked contacts are labelled FIRST so a moving person's name wins a
+    // slot over a nearby static waypoint (on a live map the person matters most).
     LblRect occ[40]; int nocc = 0;
-    for (int i = 0; i < wp.count(); i++) {
-      const Waypoint& w = wp.at(i);
-      int wx, wy; proj.project(w.lat_1e6, w.lon_1e6, wx, wy);
-      if (wx < area_x) wx = area_x;  else if (wx > wp_x_max) wx = wp_x_max;
-      if (wy < area_y) wy = area_y;  else if (wy > wp_y_max) wy = wp_y_max;
-      drawWaypointMarker(display, wx, wy);
-      char s[3] = { w.label[0], w.label[0] ? w.label[1] : (char)0, 0 };
-      drawLabelAvoiding(display, s, wx, wy, area_x, area_y, area_w, area_h, occ, nocc, 40);
-    }
-    // Live-tracked contacts ([LOC] shares): filled diamond + name initial,
-    // clamped to the frame like waypoints.
     {
       LiveTrackStore& lt = _task->liveTrack();
       uint32_t now = rtc_clock.getCurrentTime();
@@ -604,6 +595,15 @@ private:
         char s2[3] = { s.name[0], s.name[0] ? s.name[1] : (char)0, 0 };
         drawLabelAvoiding(display, s2, cx, cy, area_x, area_y, area_w, area_h, occ, nocc, 40);
       }
+    }
+    for (int i = 0; i < wp.count(); i++) {
+      const Waypoint& w = wp.at(i);
+      int wx, wy; proj.project(w.lat_1e6, w.lon_1e6, wx, wy);
+      if (wx < area_x) wx = area_x;  else if (wx > wp_x_max) wx = wp_x_max;
+      if (wy < area_y) wy = area_y;  else if (wy > wp_y_max) wy = wp_y_max;
+      drawWaypointMarker(display, wx, wy);
+      char s[3] = { w.label[0], w.label[0] ? w.label[1] : (char)0, 0 };
+      drawLabelAvoiding(display, s, wx, wy, area_x, area_y, area_w, area_h, occ, nocc, 40);
     }
 
     if (have_gps) {
