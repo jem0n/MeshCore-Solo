@@ -577,6 +577,9 @@ private:
     const int area_w = proj.area_w, area_h = proj.area_h;
     WaypointStore& wp = _task->waypoints();
     const int wp_x_max = area_x + area_w - 1, wp_y_max = area_y + area_h - 1;
+    // Reserved rectangles of labels already placed this frame, so a dense
+    // cluster of points doesn't smear their labels on top of one another.
+    LblRect occ[40]; int nocc = 0;
     for (int i = 0; i < wp.count(); i++) {
       const Waypoint& w = wp.at(i);
       int wx, wy; proj.project(w.lat_1e6, w.lon_1e6, wx, wy);
@@ -584,7 +587,7 @@ private:
       if (wy < area_y) wy = area_y;  else if (wy > wp_y_max) wy = wp_y_max;
       drawWaypointMarker(display, wx, wy);
       char s[3] = { w.label[0], w.label[0] ? w.label[1] : (char)0, 0 };
-      drawWaypointLabel(display, s, wx, wy, area_x, area_y, area_w, area_h);
+      drawLabelAvoiding(display, s, wx, wy, area_x, area_y, area_w, area_h, occ, nocc, 40);
     }
     // Live-tracked contacts ([LOC] shares): filled diamond + name initial,
     // clamped to the frame like waypoints.
@@ -599,7 +602,7 @@ private:
         if (cy < area_y) cy = area_y;  else if (cy > wp_y_max) cy = wp_y_max;
         drawContactMarker(display, cx, cy);
         char s2[3] = { s.name[0], s.name[0] ? s.name[1] : (char)0, 0 };
-        drawWaypointLabel(display, s2, cx, cy, area_x, area_y, area_w, area_h);
+        drawLabelAvoiding(display, s2, cx, cy, area_x, area_y, area_w, area_h, occ, nocc, 40);
       }
     }
 
@@ -846,6 +849,38 @@ private:
     if (ly + ch > ay + ah) ly = ay + ah - ch;     // clamp to bottom edge
     d.setCursor(lx, ly);
     d.print(s);
+  }
+
+  // Map label collision avoidance. Each placed label reserves a rectangle; a new
+  // label tries up to four offsets around its marker (upper-right, upper-left,
+  // lower-right, lower-left) and is skipped — the marker still shows — if none
+  // fit on-frame without overlapping an already-placed one. On a dense map this
+  // drops a few labels instead of smearing them into an unreadable blob.
+  struct LblRect { int x, y, w, h; };
+  static bool rectsOverlap(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh) {
+    return ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+  }
+  static void drawLabelAvoiding(DisplayDriver& d, const char* s, int wx, int wy,
+                                int ax, int ay, int aw, int ah,
+                                LblRect* occ, int& nocc, int occ_max) {
+    if (!s[0]) return;
+    int tw = (int)d.getTextWidth(s);
+    int ch = d.getLineHeight();
+    const int cand[4][2] = { { wx + 4, wy - 3 }, { wx - 4 - tw, wy - 3 },
+                             { wx + 4, wy + 3 }, { wx - 4 - tw, wy + 3 } };
+    for (int c = 0; c < 4; c++) {
+      int lx = cand[c][0], ly = cand[c][1];
+      if (lx < ax || lx + tw > ax + aw || ly < ay || ly + ch > ay + ah) continue;
+      bool clash = false;
+      for (int k = 0; k < nocc; k++)
+        if (rectsOverlap(lx, ly, tw, ch, occ[k].x, occ[k].y, occ[k].w, occ[k].h)) { clash = true; break; }
+      if (clash) continue;
+      d.setCursor(lx, ly);
+      d.print(s);
+      if (nocc < occ_max) occ[nocc++] = { lx, ly, tw, ch };
+      return;
+    }
+    // No free slot — skip the label; the marker alone still conveys the point.
   }
 
   static void drawFilledDot(DisplayDriver& d, int cx, int cy) {

@@ -81,14 +81,14 @@ Because it is the same list, all the same keys apply — **UP/DOWN** to navigate
 Records your route in a RAM ring buffer (up to 512 points, sampled every 1 s). Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
 
 > [!TIP]
-> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts); press **Enter** to open the full Trail Map, **Back** returns home.
+> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts) with a **north marker** and a **scale bar**, and a status line with the GPS-fix state, tracked-node count and distance to the **nearest** tracked contact. Press **Enter** to open the full Trail Map; **Hold Enter** shares your position (see **Live Share**); **Back** returns home.
 
 Cycle views with **LEFT / RIGHT**:
 
 | View        | Content                                                                                                                                                             |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Summary** | Distance, elapsed time, avg speed or pace, point count, tracking status                                                                                             |
-| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position**, all **waypoints**, and any **live-tracked contacts** (positions shared via Live Share) are always drawn — even with no trail recording — so the map is useful standalone |
+| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position**, all **waypoints**, and any **live-tracked contacts** (positions shared via Live Share) are always drawn — even with no trail recording — so the map is useful standalone. Point labels are auto-placed to avoid overlapping (a crowded cluster drops some labels rather than smearing them) |
 | **List**    | Per-point rows showing local time (HH:MM) and delta distance from the previous point; segment-start rows show `start`; scroll with **UP/DOWN**                      |
 
 |           OLED            |           E-Ink           |
