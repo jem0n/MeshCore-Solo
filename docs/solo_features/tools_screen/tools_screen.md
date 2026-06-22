@@ -31,13 +31,13 @@ Filter by category with **LEFT/RIGHT** (one coherent axis — type only):
 | Room   | Room servers                   |
 | Snsr   | Sensors                        |
 
-Select a node to see its coordinates, distance, bearing with cardinal direction, type, and last-heard time.
+Select a node to see its coordinates, distance, bearing with cardinal direction, type, and last-heard time. A node that is **broadcasting its position** via Live Share is marked with a **♦ diamond** beside its name in the list (the same marker the map uses), and its detail shows `Sharing pos:` with the share age and whether it's DM-verified or channel-only.
 
 **Hold Enter** opens the same **Options** menu everywhere (list and detail), in a fixed order — only the actions that apply appear:
 
 | Action                 | Available when                                                                          |
 | ---------------------- | -------------------------------------------------------------------------------------- |
-| Navigate               | selected node has GPS                                                                   |
+| Navigate               | selected node has GPS — for a node sharing live position, the view follows it as it moves and adds an ETA line |
 | Ping                   | a public key is known for the node                                                     |
 | Save waypoint          | selected node has GPS                                                                   |
 | Sort: Dist/Recent      | browsing stored nodes — **LEFT/RIGHT** on the row flips distance ↔ last-heard in place |
@@ -219,25 +219,27 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 **Receiving.** With **Track loc** on, incoming `[LOC]` messages update a small live table (up to 16 nodes, entries expire ~20 min after the last update). DM shares are keyed by the sender's public key (reliable); channel shares are keyed by name (best-effort, since channel names are unsigned). Tracked nodes appear on the **Trail Map** as a filled diamond with the first two characters of their name, and in **Nearby Nodes** with their live distance/bearing.
 
-**One-shot share.** To send your position once without enabling auto-share, use **Tools › Trail → Hold Enter → Share my pos** (or the same on the home **Map** page's full view) — it builds a `[LOC]` message and hands it to the Messages screen to pick a recipient.
+**One-shot share.** To send your position once without enabling auto-share, use **Tools › Trail → Hold Enter → Share my pos** — it builds a `[LOC]` message and hands it to the Messages screen to pick a recipient. There's also a shortcut from the home **Map** page: **Hold Enter** sends an immediate position update to your Live Share target while auto-sharing is on (toast `Position shared`), or opens the recipient picker if it isn't — so you never broadcast to a default channel by accident.
 
 ---
 
 ## Geo Alert
 
-A single **geofence** around a saved waypoint: arm it, and the device beeps and shows an alert when you cross **into** or **out of** the radius — useful for "tell me when I'm back at camp" or "alert me when I leave the meeting point". The target is a **snapshot** of a waypoint (its coordinate and label are copied), so the alert keeps working even if you later edit or delete that waypoint.
+A single **geofence** that beeps and shows an alert when you cross **into** or **out of** a radius. The target can be a **saved waypoint** (a fixed place — "tell me when I'm back at camp") or a **live contact** (a person sharing their position via Live Share — "alert me when my friend gets near / falls behind"). A waypoint target is a **snapshot** (coordinate + label copied), so it keeps working even if you later edit or delete that waypoint; a contact target follows the person's latest shared position.
 
 Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **Cancel/Back** saves and returns to Tools.
 
 | Setting | Options                          | Notes                                                                                  |
 | ------- | -------------------------------- | -------------------------------------------------------------------------------------- |
 | Alert   | ON / OFF                         | Master switch. Enabling without a target prompts you to pick one.                      |
-| Target  | saved waypoints                  | **LEFT/RIGHT** (or **Enter**) cycles through your waypoints; the chosen one is snapshotted. Shows `none` until set. |
+| Target  | waypoints + live contacts        | **LEFT/RIGHT** (or **Enter**) cycles through your waypoints and any verified (DM) live contacts; a contact target is shown with an `@` prefix. Shows `none` until set. |
 | Radius  | 50 / 100 / 250 / 500 m / 1 km    | Geofence size.                                                                          |
 | Mode    | Arrive / Leave / Both            | Which crossing fires the alert — entering the radius, leaving it, or both.              |
 | Beeper  | ON / OFF                         | Optional homing tone (see below).                                                       |
 
-**Crossing alert.** When armed with a target, the device watches its own GPS fix and fires the alert (a short melody plus an on-screen `Arrived: <name>` / `Left: <name>`) the moment you cross the radius, according to **Mode**. The edge has a little hysteresis so a fix hovering right on the boundary doesn't chatter, and the first reading after arming only seeds the in/out state — it won't fire spuriously just because you armed it while already inside.
+**Crossing alert.** When armed with a target, the device watches its own GPS fix and fires the alert (a short melody plus an on-screen message) the moment you cross the radius, according to **Mode**. The wording adapts to the target — `Arrived` / `Left` for a waypoint, `Near` / `Away` for a person. The edge has a little hysteresis so a fix hovering right on the boundary doesn't chatter, and the first reading after arming only seeds the in/out state — it won't fire spuriously just because you armed it while already inside.
+
+**Following a person.** With a **live-contact** target, the geofence tracks the distance *between you and them* using their latest shared position, so it works even while both of you move. If they stop sharing (their share goes stale), evaluation pauses until a fresh position arrives — it never alerts on an outdated fix. Only contacts whose shares are **DM-verified** can be targeted (a channel share carries no stable identity to lock onto).
 
 **Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius and respects the buzzer mute (**Settings › Sound › Buzzer**). It works independently of the arrive/leave alert, so you can use either or both.
 
