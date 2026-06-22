@@ -8,7 +8,7 @@
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
 
-The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, compass, device diagnostics, and repeater mode. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
+The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, geo-alert, compass, device diagnostics, and repeater mode. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
 
 ---
 
@@ -80,12 +80,15 @@ Because it is the same list, all the same keys apply — **UP/DOWN** to navigate
 
 Records your route in a RAM ring buffer (up to 512 points, sampled every 1 s). Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
 
+> [!TIP]
+> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts); press **Enter** to open the full Trail Map, **Back** returns home.
+
 Cycle views with **LEFT / RIGHT**:
 
 | View        | Content                                                                                                                                                             |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Summary** | Distance, elapsed time, avg speed or pace, point count, tracking status                                                                                             |
-| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position** and all **waypoints** are always drawn — even with no trail recording — so the map is useful standalone |
+| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position**, all **waypoints**, and any **live-tracked contacts** (positions shared via Live Share) are always drawn — even with no trail recording — so the map is useful standalone |
 | **List**    | Per-point rows showing local time (HH:MM) and delta distance from the previous point; segment-start rows show `start`; scroll with **UP/DOWN**                      |
 
 |           OLED            |           E-Ink           |
@@ -101,6 +104,7 @@ Cycle views with **LEFT / RIGHT**:
 | Start / Stop tracking | Begin or end a recording session                    |
 | Mark here             | Drop a waypoint at the current GPS fix (see below)  |
 | Waypoints…            | Open the waypoint list / navigation / add-by-coords |
+| Share my pos          | Send your current position as a one-shot `[LOC]` message — pick a contact or channel (see **Live Share**) |
 | Trail file…           | Open the file submenu (below)                        |
 | Settings…             | Open the settings submenu (below)                    |
 
@@ -116,13 +120,16 @@ Cycle views with **LEFT / RIGHT**:
 
 **Settings…** (values cycle with **LEFT/RIGHT** or **Enter**; shown only where they apply):
 
-| Item     | Available | Action                                                  |
-| -------- | --------- | ------------------------------------------------------- |
-| Min dist | always    | Sample gate, 4 levels — metric: 5/10/25/100 m, imperial: 15/30/75/300 ft |
-| Readout  | Summary view | Summary shows Speed or Pace (in the global unit system) |
-| Grid     | Map view  | Toggle scale grid on the map                            |
+| Item       | Available | Action                                                  |
+| ---------- | --------- | ------------------------------------------------------- |
+| Min dist   | always    | Sample gate, 4 levels — metric: 5/10/25/100 m, imperial: 15/30/75/300 ft |
+| Auto-pause | always    | Off / 1 / 2 / 5 min — auto-freeze the trail after a stop, resume on movement (see below) |
+| Readout    | Summary view | Summary shows Speed or Pace (in the global unit system) |
+| Grid       | Map view  | Toggle scale grid on the map                            |
 
 (Trail file… appears only when a live or saved trail exists. Mark here needs a GPS fix; Waypoints is always available.)
+
+**Auto-pause** — when set, a recording trail automatically **pauses** after the device has stayed within ~15 m of one spot for the chosen delay: the elapsed timer and point sampling both freeze, and the map line breaks across the idle gap. It **resumes on its own** as soon as you move again. This keeps a stop (a break, a meal, parking) out of your distance and average-speed stats without you having to remember to stop and restart tracking. A paused trail is still "on" (the **G** marker keeps blinking) — the Summary **Status** row shows `paused`. The stop is detected with its own coarse movement gate, independent of **Min dist**, so GPS jitter while you're parked doesn't keep it awake.
 
 ### Waypoints
 
@@ -188,6 +195,54 @@ Periodically broadcasts a 0-hop advert with your GPS position. Configurable inte
 
 > [!TIP]
 > **Audible connection heartbeat** — the device chirps each time it *receives* an advert from any node (sound chosen in **Settings › Sound › AD sound**). With Auto-Advert running on both ends (e.g. two people on a hike), each hearing the other's periodic advert becomes a hands-free "in range" beep — no need to look at the screen. It fires for **every** received advert, so in a busy mesh it can get chatty; choose `None` in **Settings › Sound › AD sound** to silence just this event, or set **Settings › Sound › Advert scope** to `Zero-hop` to limit it to local adverts only. You can also set **Settings › Sound › Buzzer** to *Off* (or *Auto*, which mutes while a companion app is connected) to silence all buzzer output.
+
+---
+
+## Live Share
+
+Share your live position over the mesh **as ordinary chat messages**, and put other people who do the same on your map. A position is sent as a `[LOC]<lat>,<lon>` message — the same coordinate format waypoints use, so it stays readable on other firmware and the phone app (it just looks like a coordinate to anything that doesn't know the tag).
+
+This is **independent of Auto-Advert** and runs alongside it: Auto-Advert announces your *presence* as a 0-hop beacon for Nearby Nodes, while Live Share sends your *position* to a specific channel or contact you choose.
+
+The tool holds both directions of sharing in one flat list. Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **Cancel/Back** saves and returns to Tools.
+
+| Setting    | Options                     | Notes                                                                                          |
+| ---------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| Track loc  | ON / OFF                    | Receive incoming `[LOC]` shares (DM and monitored channels) and pin those senders on the map / in Nearby. Off by default. |
+| Auto share | ON / OFF                    | Periodically broadcast **your own** position to the target below while you move.                |
+| To         | channel or contact          | **Enter** opens the Messages recipient chooser to pick the target channel or DM contact.        |
+| Move       | 50 / 100 / 250 / 500 m      | Movement gate — only send after you've moved at least this far since the last share.            |
+| Min gap    | 30 s / 1 / 2 / 5 min        | Minimum time between sends, so fast movement can't flood the channel.                           |
+| Heartbeat  | Off / 5 / 15 min            | Optional keep-alive: re-send even while stationary, so the other end knows you're still there.  |
+
+**How auto-share decides to send.** With **Auto share** on, the device checks a few times a minute: it transmits when you've moved at least **Move** metres *and* at least **Min gap** has passed since the last send — so a stationary device stays silent unless a **Heartbeat** is set. It also sends once immediately when you enable sharing (or change the target), so the other end gets a fresh fix right away.
+
+**Receiving.** With **Track loc** on, incoming `[LOC]` messages update a small live table (up to 16 nodes, entries expire ~20 min after the last update). DM shares are keyed by the sender's public key (reliable); channel shares are keyed by name (best-effort, since channel names are unsigned). Tracked nodes appear on the **Trail Map** as a filled diamond with the first two characters of their name, and in **Nearby Nodes** with their live distance/bearing.
+
+**One-shot share.** To send your position once without enabling auto-share, use **Tools › Trail → Hold Enter → Share my pos** (or the same on the home **Map** page's full view) — it builds a `[LOC]` message and hands it to the Messages screen to pick a recipient.
+
+---
+
+## Geo Alert
+
+A single **geofence** around a saved waypoint: arm it, and the device beeps and shows an alert when you cross **into** or **out of** the radius — useful for "tell me when I'm back at camp" or "alert me when I leave the meeting point". The target is a **snapshot** of a waypoint (its coordinate and label are copied), so the alert keeps working even if you later edit or delete that waypoint.
+
+Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **Cancel/Back** saves and returns to Tools.
+
+| Setting | Options                          | Notes                                                                                  |
+| ------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| Alert   | ON / OFF                         | Master switch. Enabling without a target prompts you to pick one.                      |
+| Target  | saved waypoints                  | **LEFT/RIGHT** (or **Enter**) cycles through your waypoints; the chosen one is snapshotted. Shows `none` until set. |
+| Radius  | 50 / 100 / 250 / 500 m / 1 km    | Geofence size.                                                                          |
+| Mode    | Arrive / Leave / Both            | Which crossing fires the alert — entering the radius, leaving it, or both.              |
+| Beeper  | ON / OFF                         | Optional homing tone (see below).                                                       |
+
+**Crossing alert.** When armed with a target, the device watches its own GPS fix and fires the alert (a short melody plus an on-screen `Arrived: <name>` / `Left: <name>`) the moment you cross the radius, according to **Mode**. The edge has a little hysteresis so a fix hovering right on the boundary doesn't chatter, and the first reading after arming only seeds the in/out state — it won't fire spuriously just because you armed it while already inside.
+
+**Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius and respects the buzzer mute (**Settings › Sound › Buzzer**). It works independently of the arrive/leave alert, so you can use either or both.
+
+> [!TIP]
+> Mark the spot first with **Tools › Trail → Hold Enter → Mark here** (or **+ Add by coords**), then set it as the Geo Alert target.
 
 ---
 
