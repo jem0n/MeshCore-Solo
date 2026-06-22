@@ -2338,17 +2338,24 @@ void UITask::onSharedLocation(const uint8_t* pub_key, const char* name,
 
 bool UITask::sendLocationShare(int32_t lat, int32_t lon) {
   if (!_node_prefs) return false;
-  char text[40];
-  snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
+  char text[80];
   if (_node_prefs->loc_share_target_type == 0) {
+    // Channel: sendGroupMessage prepends "<name>: ", so the payload already
+    // names the sender — keep the [LOC] text bare.
+    snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
     ChannelDetails ch;
     if (!the_mesh.getChannel(_node_prefs->loc_share_channel_idx, ch)) return false;
     return the_mesh.sendGroupMessage(rtc_clock.getCurrentTime(), ch.channel,
                                      the_mesh.getNodeName(), text, strlen(text));
   }
+  // DM carries no per-message sender prefix, so embed the name in the text — the
+  // share is then self-describing in any chat client (a trailing token after the
+  // coordinate, which parseLocShare ignores on the receiving side).
   ContactInfo* c = the_mesh.lookupContactByPubKey(_node_prefs->loc_share_dm_prefix,
                                                   NodePrefs::FAVOURITE_PREFIX_LEN);
   if (!c) return false;
+  snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f %s",
+           lat / 1e6, lon / 1e6, the_mesh.getNodeName());
   uint32_t expected_ack = 0, est_timeout = 0;
   return the_mesh.sendMessage(*c, rtc_clock.getCurrentTime(), 0, text, expected_ack, est_timeout) > 0;
 }
