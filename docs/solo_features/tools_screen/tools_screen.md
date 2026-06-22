@@ -241,7 +241,7 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 
 **Following a person.** With a **live-contact** target, the geofence tracks the distance *between you and them* using their latest shared position, so it works even while both of you move. If they stop sharing (their share goes stale), evaluation pauses until a fresh position arrives — it never alerts on an outdated fix. Only contacts whose shares are **DM-verified** can be targeted (a channel share carries no stable identity to lock onto).
 
-**Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius and respects the buzzer mute (**Settings › Sound › Buzzer**). It works independently of the arrive/leave alert, so you can use either or both.
+**Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius. Because the beeper is its own opt-in toggle, turning it on **overrides the global buzzer mute** (**Settings › Sound › Buzzer**) — it's an explicit "I want to hear this". It works independently of the arrive/leave crossing alert (which does follow the mute), so you can use either or both.
 
 > [!TIP]
 > Mark the spot first with **Tools › Trail → Hold Enter → Mark here** (or **+ Add by coords**), then set it as the Geo Alert target.

@@ -2188,12 +2188,14 @@ void UITask::fireGeoAlert(bool arrived) {
 // Homing beeper: while armed with a target and inside the radius, emit a short
 // tick whose interval shrinks linearly with distance — slow at the edge, rapid
 // near the centre. Polls distance a few times a second; silent outside the
-// radius and when the buzzer is muted.
+// radius. The beeper has its own toggle (geo_alert_beeper), so turning it on is
+// an explicit "I want to hear this" — it deliberately overrides the global
+// buzzer mute (playMelody → buzzer.playForced ignores the quiet flag).
 void UITask::geoProximityBeeper() {
   static const uint32_t BEEP_MIN_MS = 150;    // fastest cadence (at the target)
   static const uint32_t BEEP_MAX_MS = 2000;   // slowest cadence (at the edge)
   if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_beeper
-      || !_node_prefs->geo_alert_has_target || isBuzzerQuiet()) {
+      || !_node_prefs->geo_alert_has_target) {
     return;
   }
   if ((int32_t)(millis() - _geo_beep_check_ms) < 0) return;
