@@ -1,11 +1,15 @@
 #pragma once
 // Live location sharing config tool. Tools › Live Share.
-// Periodically broadcasts a [LOC] message to a chosen channel/contact while
-// moving. Independent of (and able to run alongside) the 0-hop Auto-Advert.
+// One place for both directions of position sharing:
+//   Track loc  — receive [LOC] shares from others (LiveTrackStore).
+//   Auto share — periodically broadcast my own [LOC] to a channel/contact
+//                while moving (movement-gated engine in UITask).
+// Independent of (and able to run alongside) the 0-hop Auto-Advert. The
+// one-shot "Share my pos" lives on the Map screen.
 // Included by UITask.cpp after AutoAdvertScreen.h.
 
-#include "../GeoUtils.h"      // LOCATION_MSG_TAG
 #include "../NodePrefs.h"
+#include "icons.h"   // scrollIndicatorReserve / drawScrollIndicator
 
 class LiveShareScreen : public UIScreen {
   UITask*    _task;
@@ -14,43 +18,27 @@ class LiveShareScreen : public UIScreen {
   int        _sel    = 0;
   int        _scroll = 0;
 
-  // Row model — headers are non-selectable section separators.
-  enum Kind : uint8_t { K_HEADER, K_TRACK, K_AUTO, K_TARGET, K_MOVE, K_GAP, K_HB, K_SHARE_NOW };
+  enum Kind : uint8_t { K_TRACK, K_AUTO, K_TARGET, K_MOVE, K_GAP, K_HB };
   struct Row { Kind kind; const char* label; };
-  static const int ROW_COUNT = 12;
+  static const int ROW_COUNT = 6;
   static Row rows(int i) {
     static const Row R[ROW_COUNT] = {
-      { K_HEADER,     "Receive" },
-      { K_TRACK,      "Track loc" },
-      { K_HEADER,     "Send" },
-      { K_AUTO,       "Auto share" },
-      { K_HEADER,     "Target" },
-      { K_TARGET,     "To" },
-      { K_HEADER,     "Triggers" },
-      { K_MOVE,       "Move" },
-      { K_GAP,        "Min gap" },
-      { K_HB,         "Heartbeat" },
-      { K_HEADER,     "" },
-      { K_SHARE_NOW,  "Share now" },
+      { K_TRACK,  "Track loc" },
+      { K_AUTO,   "Auto share" },
+      { K_TARGET, "To" },
+      { K_MOVE,   "Move" },
+      { K_GAP,    "Min gap" },
+      { K_HB,     "Heartbeat" },
     };
     return R[i];
   }
-  static bool selectable(Kind k) { return k != K_HEADER; }
 
 public:
   LiveShareScreen(UITask* task, NodePrefs* prefs) : _task(task), _prefs(prefs) {}
 
-  void enter() {
-    _dirty = false;
-    if (!selectable(rows(_sel).kind)) _sel = firstSelectable();
-  }
+  void enter() { _dirty = false; _sel = 0; _scroll = 0; }
 
-  int firstSelectable() const {
-    for (int i = 0; i < ROW_COUNT; i++) if (selectable(rows(i).kind)) return i;
-    return 0;
-  }
-
-  // ── target helpers ─────────────────────────────────────────────────────────
+  // Resolve the configured target's display name (channel name or contact name).
   void currentTargetName(char* buf, int n) {
     if (!_prefs) { snprintf(buf, n, "none"); return; }
     if (_prefs->loc_share_target_type == 0) {
@@ -66,7 +54,6 @@ public:
     }
   }
 
-  // ── value label for a row ──────────────────────────────────────────────────
   void valueLabel(Kind k, char* buf, int n) {
     switch (k) {
       case K_TRACK:
@@ -104,57 +91,41 @@ public:
 
     const int y0   = display.listStart();
     const int step = display.lineStep();
-    const int valx = display.width() / 2 + 6;
 
-    // Scroll window: keep the selected row visible.
     int vis = (display.height() - y0) / step;
     if (vis < 1) vis = 1;
     if (_sel < _scroll) _scroll = _sel;
     if (_sel >= _scroll + vis) _scroll = _sel - vis + 1;
     if (_scroll < 0) _scroll = 0;
-    if (_scroll > ROW_COUNT - vis) _scroll = (ROW_COUNT > vis) ? ROW_COUNT - vis : 0;
+
+    const int reserve = scrollIndicatorReserve(display, ROW_COUNT, vis);
+    const int valx    = display.width() / 2 + 6;
 
     for (int i = _scroll; i < ROW_COUNT && i < _scroll + vis; i++) {
       int y = y0 + (i - _scroll) * step;
       Row r = rows(i);
-      if (r.kind == K_HEADER) {
-        if (r.label[0]) {
-          display.setColor(DisplayDriver::LIGHT);
-          display.setCursor(2, y);
-          display.print(r.label);
-        }
-        continue;
-      }
       bool sel = (i == _sel);
-      display.drawSelectionRow(0, y - 1, display.width(), step - 1, sel);
+      display.drawSelectionRow(0, y - 1, display.width() - reserve, step - 1, sel);
       display.setCursor(4, y);
       display.print(r.label);
       char val[24];
       valueLabel(r.kind, val, sizeof(val));
-      if (val[0]) {
-        display.setCursor(valx, y);
-        display.print(val);
-      }
+      if (val[0]) display.drawTextEllipsized(valx, y, display.width() - valx - reserve, val);
     }
+
+    drawScrollIndicator(display, y0, vis * step, ROW_COUNT, vis, _scroll);
     return 500;
   }
 
-  void moveSel(int dir) {
-    int i = _sel;
-    for (int step = 0; step < ROW_COUNT; step++) {
-      i = (i + dir + ROW_COUNT) % ROW_COUNT;
-      if (selectable(rows(i).kind)) { _sel = i; return; }
-    }
-  }
+  void moveSel(int dir) { _sel = (_sel + dir + ROW_COUNT) % ROW_COUNT; }
 
-  // Cycle/act on the selected row. `enter` distinguishes ENTER (which opens the
-  // target picker / fires Share now) from LEFT/RIGHT (value cycling only).
+  // Cycle/act on the selected row. `enter` opens the target picker (vs LEFT/RIGHT
+  // value cycling).
   void activate(int dir, bool enter) {
     if (!_prefs) return;
-    Kind k = rows(_sel).kind;
-    switch (k) {
+    switch (rows(_sel).kind) {
       case K_TRACK: _prefs->track_shared_loc ^= 1; _dirty = true; break;
-      case K_AUTO: _prefs->loc_share_enabled ^= 1; _dirty = true; break;
+      case K_AUTO:  _prefs->loc_share_enabled ^= 1; _dirty = true; break;
       case K_TARGET:
         if (enter) { _task->pickLocShareTarget(); return; }  // full chooser
         cycleTarget(dir); _dirty = true;                     // L/R quick cycle
@@ -168,8 +139,6 @@ public:
       case K_HB:
         _prefs->loc_share_heartbeat_idx = (uint8_t)((_prefs->loc_share_heartbeat_idx + (dir >= 0 ? 1 : NodePrefs::LOC_SHARE_HEARTBEAT_COUNT - 1)) % NodePrefs::LOC_SHARE_HEARTBEAT_COUNT);
         _dirty = true; break;
-      case K_SHARE_NOW: shareNow(); break;
-      default: break;
     }
   }
 
@@ -200,14 +169,6 @@ public:
     _prefs->loc_share_target_type = list[nx].type;
     if (list[nx].type == 0) _prefs->loc_share_channel_idx = list[nx].ch;
     else memcpy(_prefs->loc_share_dm_prefix, list[nx].prefix, NodePrefs::FAVOURITE_PREFIX_LEN);
-  }
-
-  void shareNow() {
-    int32_t lat, lon;
-    if (!_task->currentLocation(lat, lon)) { _task->showAlert("No GPS fix", 1000); return; }
-    char text[40];
-    snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
-    _task->shareToMessage(text);
   }
 
   bool handleInput(char c) override {

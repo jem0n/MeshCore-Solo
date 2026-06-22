@@ -584,7 +584,7 @@ private:
         if (cx < area_x) cx = area_x;  else if (cx > wp_x_max) cx = wp_x_max;
         if (cy < area_y) cy = area_y;  else if (cy > wp_y_max) cy = wp_y_max;
         drawContactMarker(display, cx, cy);
-        char s2[2] = { s.name[0], 0 };
+        char s2[3] = { s.name[0], s.name[0] ? s.name[1] : (char)0, 0 };
         drawWaypointLabel(display, s2, cx, cy, area_x, area_y, area_w, area_h);
       }
     }

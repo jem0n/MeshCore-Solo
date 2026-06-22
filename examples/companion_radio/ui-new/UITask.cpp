@@ -963,8 +963,7 @@ public:
       int32_t la, lo;
       bool fix = _task->currentLocation(la, lo);
       int trk = _task->liveTrack().active(rtc_clock.getCurrentTime());
-      snprintf(info, sizeof(info), "Fix:%s  Track:%d  %s",
-               fix ? "y" : "n", trk, PRESS_LABEL);
+      snprintf(info, sizeof(info), "Fix:%s  Track:%d", fix ? "y" : "n", trk);
       display.setColor(DisplayDriver::LIGHT);
       if (!drew)
         display.drawTextCentered(display.width() / 2, content_y + area_h / 2, "No GPS / no trail");
