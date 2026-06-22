@@ -627,13 +627,41 @@ public:
     return true;
   }
 
+  // Small 5x5 glyph shown in the page-indicator row for each HomePage.
+  static const MiniIcon* pageIcon(int page) {
+    switch (page) {
+      case CLOCK:      return &ICON_PG_CLOCK;
+      case FAVOURITES: return &ICON_PG_STAR;
+      case RECENT:     return &ICON_PG_RECENT;
+      case RADIO:      return &ICON_PG_RADIO;
+      case BLUETOOTH:  return &ICON_PG_BT;
+      case ADVERT:     return &ICON_PG_ADVERT;
+#if ENV_INCLUDE_GPS == 1
+      case GPS:        return &ICON_PG_GPS;
+#endif
+#if UI_SENSORS_PAGE == 1
+      case SENSORS:    return &ICON_PG_SENSORS;
+#endif
+      case SETTINGS:   return &ICON_PG_SETTINGS;
+      case MAP:        return &ICON_PG_MAP;
+      case TOOLS:      return &ICON_PG_TOOLS;
+      case QUICK_MSG:  return &ICON_PG_MSG;
+      case SHUTDOWN:   return &ICON_PG_POWER;
+    }
+    return nullptr;
+  }
+
   int render(DisplayDriver& display) override {
     char tmp[80];
     display.setTextSize(1);
     const int lh      = display.getLineHeight();  // line height at sz1
     const int step    = display.lineStep();        // lh + 2
-    const int dots_y  = lh + 4;                   // page-dot row: just below header
-    const int content_y = dots_y + 6;             // first content row (6px gap keeps dots visible)
+    // Page-indicator row: small (5px) page icons replace the old dots. Centre and
+    // gap scale with the font so the band clears the header above and content
+    // below (identical to the old lh+4 / +6 dots layout at 1x).
+    const int pg_half   = (5 * miniIconScale(display) + 1) / 2;
+    const int dots_y    = lh + pg_half + 1;       // icon-row centre, below the header
+    const int content_y = dots_y + pg_half + 3;   // first content row, below the icons
 
     // node name + battery — hidden on CLOCK page (full screen used for dashboard)
     if (_page != CLOCK) {
@@ -660,17 +688,26 @@ public:
     // ensure current page is visible (e.g. after settings change)
     if (!isPageVisible(_page)) _page = navPage(_page, +1);
 
-    // curr page indicator — hidden on CLOCK page (full screen used for dashboard)
+    // curr page indicator — a row of small page icons, one per visible page, with
+    // the current page underlined. Hidden on CLOCK (full screen used for dashboard).
     if (_page != CLOCK) {
       int order[(int)Count]; int n = buildVisibleOrder(order);
       int curr_vis = 0;
       for (int i = 0; i < n; i++) if (order[i] == _page) { curr_vis = i; break; }
-      int x = display.width() / 2 - 5 * (n - 1);
+      const int s        = miniIconScale(display);
+      const int icon_w   = 5 * s;
+      int pitch = icon_w + 5 * s;                       // comfortable spacing
+      if (n > 1) {                                      // shrink to fit if many pages
+        int fit = (display.width() - icon_w) / (n - 1);
+        if (fit < pitch) pitch = fit;
+      }
+      int x = display.width() / 2 - pitch * (n - 1) / 2;
       for (int i = 0; i < n; i++) {
-        int ds = display.isLandscape() ? 2 : 1;
-        if (i == curr_vis) display.fillRect(x-ds, dots_y-ds, 2*ds+1, 2*ds+1);
-        else               display.fillRect(x-ds+1, dots_y-ds+1, 2*ds-1, 2*ds-1);
-        x += 10;
+        const MiniIcon* ic = pageIcon(order[i]);
+        if (ic) miniIconDrawCentered(display, x, dots_y, *ic);
+        if (i == curr_vis)                              // underline the current page
+          display.fillRect(x - icon_w / 2, dots_y + pg_half + 1, icon_w, s);
+        x += pitch;
       }
     }
 
