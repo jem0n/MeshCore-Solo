@@ -116,6 +116,7 @@ class UITask : public AbstractUITask {
   // is when the next tick is due.
   uint32_t _geo_beep_check_ms = 0;
   uint32_t _geo_beep_next_ms = 0;
+  bool geoAlertDistance(float& dist_m, float& radius_m) const;
   void evaluateGeoAlert();
   void fireGeoAlert(bool arrived);
   void geoProximityBeeper();

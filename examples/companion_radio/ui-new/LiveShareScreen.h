@@ -9,7 +9,7 @@
 // Included by UITask.cpp after AutoAdvertScreen.h.
 
 #include "../NodePrefs.h"
-#include "icons.h"   // scrollIndicatorReserve / drawScrollIndicator
+#include "icons.h"   // drawList (shared scrolling-list helper)
 
 class LiveShareScreen : public UIScreen {
   UITask*    _task;
@@ -89,31 +89,16 @@ public:
     display.setColor(DisplayDriver::LIGHT);
     display.drawCenteredHeader("LIVE SHARE");
 
-    const int y0   = display.listStart();
-    const int step = display.lineStep();
-
-    int vis = (display.height() - y0) / step;
-    if (vis < 1) vis = 1;
-    if (_sel < _scroll) _scroll = _sel;
-    if (_sel >= _scroll + vis) _scroll = _sel - vis + 1;
-    if (_scroll < 0) _scroll = 0;
-
-    const int reserve = scrollIndicatorReserve(display, ROW_COUNT, vis);
-    const int valx    = display.width() / 2 + 6;
-
-    for (int i = _scroll; i < ROW_COUNT && i < _scroll + vis; i++) {
-      int y = y0 + (i - _scroll) * step;
+    const int valx = display.width() / 2 + 6;
+    drawList(display, ROW_COUNT, _sel, _scroll, [&](int i, int y, bool sel, int reserve) {
       Row r = rows(i);
-      bool sel = (i == _sel);
-      display.drawSelectionRow(0, y - 1, display.width() - reserve, step - 1, sel);
+      display.drawSelectionRow(0, y - 1, display.width() - reserve, display.lineStep() - 1, sel);
       display.setCursor(4, y);
       display.print(r.label);
       char val[24];
       valueLabel(r.kind, val, sizeof(val));
       if (val[0]) display.drawTextEllipsized(valx, y, display.width() - valx - reserve, val);
-    }
-
-    drawScrollIndicator(display, y0, vis * step, ROW_COUNT, vis, _scroll);
+    });
     return 500;
   }
 

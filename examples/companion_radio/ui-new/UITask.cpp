@@ -2032,15 +2032,17 @@ void UITask::loop() {
       int32_t lo = (int32_t)loc->getLongitude();
       uint16_t md = TrailStore::minDeltaMeters(_node_prefs->trail_min_delta_idx,
                                                 _node_prefs->units_imperial);
-      // Auto-pause: freeze the trail once the device has sat within the
-      // min-delta gate for the configured delay; resume on the next real move.
+      // Auto-pause: freeze the trail once the device has stayed within
+      // TRAIL_AUTOPAUSE_MOVE_M of one spot for the configured delay; resume on
+      // the next real move. Its own coarse gate (not the trail min-delta) so
+      // GPS jitter while parked doesn't keep the idle timer alive.
       uint16_t ap = NodePrefs::trailAutoPauseSecs(_node_prefs->trail_autopause_idx);
       if (ap > 0) {
         uint32_t now = millis();
         float moved = _trail_pause_has_ref
             ? geo::haversineKm(_trail_pause_ref_lat, _trail_pause_ref_lon, la, lo) * 1000.0f
             : 1e9f;
-        if (!_trail_pause_has_ref || moved >= (float)md) {
+        if (!_trail_pause_has_ref || moved >= (float)NodePrefs::TRAIL_AUTOPAUSE_MOVE_M) {
           _trail_pause_ref_lat = la; _trail_pause_ref_lon = lo;
           _trail_pause_has_ref = true;
           _trail_last_move_ms  = now;
@@ -2121,17 +2123,27 @@ void UITask::loop() {
 // fires fireGeoAlert() according to the configured mode; a hysteresis band on
 // the "leave" edge stops it chattering at the boundary, and the first reading
 // after arming only seeds the inside/outside state (no spurious alert).
+// Distance (m) from the current GPS fix to the geo-alert target, plus the
+// configured radius (m). Returns false when no target is set or there's no fix
+// — the single place the target-distance maths lives, shared by the crossing
+// evaluator and the proximity beeper.
+bool UITask::geoAlertDistance(float& dist_m, float& radius_m) const {
+  if (!_node_prefs || !_node_prefs->geo_alert_has_target) return false;
+  int32_t lat, lon;
+  if (!currentLocation(lat, lon)) return false;
+  dist_m   = geo::haversineKm(lat, lon, _node_prefs->geo_alert_lat_1e6,
+                              _node_prefs->geo_alert_lon_1e6) * 1000.0f;
+  radius_m = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  return true;
+}
+
 void UITask::evaluateGeoAlert() {
   if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_has_target) {
     _geo_alert_known = false;
     return;
   }
-  int32_t lat, lon;
-  if (!currentLocation(lat, lon)) return;
-  float dist = geo::haversineKm(lat, lon,
-                                _node_prefs->geo_alert_lat_1e6,
-                                _node_prefs->geo_alert_lon_1e6) * 1000.0f;
-  float r = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  float dist, r;
+  if (!geoAlertDistance(dist, r)) return;   // armed but no fix yet — keep state
   bool inside;
   if (!_geo_alert_known)        inside = dist <= r;            // seed state
   else if (_geo_alert_inside)   inside = dist <= r * 1.25f;    // leave past band
@@ -2169,12 +2181,8 @@ void UITask::geoProximityBeeper() {
   if ((int32_t)(millis() - _geo_beep_check_ms) < 0) return;
   _geo_beep_check_ms = millis() + 250UL;
 
-  int32_t lat, lon;
-  if (!currentLocation(lat, lon)) return;
-  float dist = geo::haversineKm(lat, lon,
-                                _node_prefs->geo_alert_lat_1e6,
-                                _node_prefs->geo_alert_lon_1e6) * 1000.0f;
-  float r = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  float dist, r;
+  if (!geoAlertDistance(dist, r)) return;
   if (dist > r) {                       // outside the zone: stay quiet, beep on re-entry
     _geo_beep_next_ms = millis();
     return;

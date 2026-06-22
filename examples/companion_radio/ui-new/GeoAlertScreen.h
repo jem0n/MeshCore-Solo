@@ -9,7 +9,7 @@
 
 #include "../NodePrefs.h"
 #include "../Waypoint.h"
-#include "icons.h"   // scrollIndicatorReserve / drawScrollIndicator
+#include "icons.h"   // drawList (shared scrolling-list helper)
 
 class GeoAlertScreen : public UIScreen {
   UITask*    _task;
@@ -71,31 +71,16 @@ public:
     display.setColor(DisplayDriver::LIGHT);
     display.drawCenteredHeader("GEO ALERT");
 
-    const int y0   = display.listStart();
-    const int step = display.lineStep();
-
-    int vis = (display.height() - y0) / step;
-    if (vis < 1) vis = 1;
-    if (_sel < _scroll) _scroll = _sel;
-    if (_sel >= _scroll + vis) _scroll = _sel - vis + 1;
-    if (_scroll < 0) _scroll = 0;
-
-    const int reserve = scrollIndicatorReserve(display, ROW_COUNT, vis);
-    const int valx    = display.width() / 2 + 6;
-
-    for (int i = _scroll; i < ROW_COUNT && i < _scroll + vis; i++) {
-      int y = y0 + (i - _scroll) * step;
+    const int valx = display.width() / 2 + 6;
+    drawList(display, ROW_COUNT, _sel, _scroll, [&](int i, int y, bool sel, int reserve) {
       Row r = rows(i);
-      bool sel = (i == _sel);
-      display.drawSelectionRow(0, y - 1, display.width() - reserve, step - 1, sel);
+      display.drawSelectionRow(0, y - 1, display.width() - reserve, display.lineStep() - 1, sel);
       display.setCursor(4, y);
       display.print(r.label);
       char val[24];
       valueLabel(r.kind, val, sizeof(val));
       if (val[0]) display.drawTextEllipsized(valx, y, display.width() - valx - reserve, val);
-    }
-
-    drawScrollIndicator(display, y0, vis * step, ROW_COUNT, vis, _scroll);
+    });
     return 500;
   }
 
@@ -128,6 +113,9 @@ public:
         _dirty = true;
         break;
     }
+    // Re-seed the crossing engine after any change so editing the target/radius
+    // while armed can't fire a stale arrive/leave before the screen is closed.
+    _task->resetGeoAlert();
   }
 
   // Cycle the target through the saved waypoints, snapshotting the chosen one's
@@ -157,7 +145,7 @@ public:
 
   bool handleInput(char c) override {
     if (c == KEY_CANCEL || c == KEY_CONTEXT_MENU) {
-      if (_dirty) { the_mesh.savePrefs(); _task->resetGeoAlert(); _dirty = false; }
+      if (_dirty) { the_mesh.savePrefs(); _dirty = false; }   // engine re-seeded per edit
       _task->gotoToolsScreen();
       return true;
     }

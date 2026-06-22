@@ -300,6 +300,11 @@ struct NodePrefs {  // persisted to file
     static const char* L[TRAIL_AUTOPAUSE_COUNT] = { "Off", "1m", "2m", "5m" };
     return L[idx < TRAIL_AUTOPAUSE_COUNT ? idx : 0];
   }
+  // Movement under this many metres counts as "stationary" for auto-pause.
+  // Deliberately coarser than the trail min-delta gate (and independent of it)
+  // so GPS jitter while parked doesn't keep resetting the idle timer. Engine
+  // tuning only — not persisted.
+  static const uint16_t TRAIL_AUTOPAUSE_MOVE_M = 15;
 
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
