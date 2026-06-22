@@ -28,6 +28,7 @@ class TrailScreen : public UIScreen {
   int     _list_max_scroll    = 0;
   bool    _cfg_dirty      = false;
   bool    _map_grid       = true;   // show scale grid in map view (Enter to toggle)
+  bool    _return_home    = false;  // entered via Home "Map" page → KEY_CANCEL returns to Home
 
   // Waypoint management UI (list / nav / add / mark / rename / delete / send)
   // lives in its own component; TrailScreen delegates to it while it's active.
@@ -38,10 +39,13 @@ class TrailScreen : public UIScreen {
   // (Start/Stop tracking, Reset). PopupMenu stores label pointers verbatim, so
   // the labels live in member buffers that get refreshed in openActionMenu()
   // and after every LEFT/RIGHT cycle.
-  enum ActionId { ACT_MIN_DIST, ACT_UNITS, ACT_GRID, ACT_TOGGLE, ACT_SAVE, ACT_LOAD, ACT_RESET, ACT_EXPORT, ACT_EXPORT_SAVED, ACT_MARK, ACT_WAYPOINTS, ACT_FILE, ACT_SETTINGS };
-  // The action popup is two-level: a short main menu, plus "Trail file…" and
+  enum ActionId { ACT_MIN_DIST, ACT_UNITS, ACT_GRID, ACT_TOGGLE, ACT_SAVE, ACT_LOAD, ACT_RESET, ACT_EXPORT, ACT_EXPORT_SAVED, ACT_MARK, ACT_WAYPOINTS, ACT_FILE, ACT_SETTINGS,
+                 ACT_SHARE_NOW };
+  // The action popup is multi-level: a short main menu, plus "Trail file…" and
   // "Settings…" submenus. _menu_level tracks which is open so input is routed
   // correctly (settings rows cycle with LEFT/RIGHT; everything else is Enter).
+  // Live-share *config* lives in its own tool (Tools › Live Share); the map only
+  // keeps the one-shot "Share my pos" action.
   enum MenuLevel { ML_MAIN, ML_FILE, ML_SETTINGS };
   PopupMenu _action_menu;
   uint8_t   _menu_level = ML_MAIN;
@@ -65,8 +69,13 @@ public:
     _cfg_dirty      = false;
     _action_menu.active = false;
     _menu_level     = ML_MAIN;
+    _return_home    = false;
     _wp.reset();
   }
+
+  // Enter straight into the Map view (used by the Home "Map" page). Remembers
+  // that we came from Home so KEY_CANCEL returns there, not to Tools.
+  void enterMap() { enter(); _view = V_MAP; _return_home = true; }
 
   int render(DisplayDriver& display) override {
     display.setTextSize(1);
@@ -101,11 +110,10 @@ public:
       // LEFT/RIGHT cycles the focused value — only meaningful in the Settings
       // submenu; the popup stays open so the user can keep tapping.
       if (c == KEY_LEFT || c == KEY_RIGHT || c == KEY_PREV || c == KEY_NEXT) {
-        if (_menu_level == ML_SETTINGS) {
-          int idx = _action_menu.selectedIndex();
-          if (idx >= 0 && idx < _act_count)
-            cycleSetting((ActionId)_act_map[idx], (c == KEY_RIGHT || c == KEY_NEXT) ? 1 : -1);
-        }
+        int dir = (c == KEY_RIGHT || c == KEY_NEXT) ? 1 : -1;
+        int idx = _action_menu.selectedIndex();
+        if (idx >= 0 && idx < _act_count && _menu_level == ML_SETTINGS)
+          cycleSetting((ActionId)_act_map[idx], dir);
         return true;  // swallow elsewhere
       }
       auto res = _action_menu.handleInput(c);
@@ -113,12 +121,13 @@ public:
         int sel = _action_menu.selectedIndex();
         ActionId act = (sel >= 0 && sel < _act_count) ? (ActionId)_act_map[sel] : ACT_TOGGLE;
         switch (act) {
-          case ACT_FILE:     buildFileMenu();     return true;   // descend into submenu
-          case ACT_SETTINGS: buildSettingsMenu(); return true;
+          case ACT_FILE:      buildFileMenu();     return true;   // descend into submenu
+          case ACT_SETTINGS:  buildSettingsMenu(); return true;
           // Settings rows: Enter advances/toggles the value and keeps focus.
           case ACT_MIN_DIST:
           case ACT_UNITS:
           case ACT_GRID:     cycleSetting(act, 1); reopenSettingsAt(sel); return true;
+          case ACT_SHARE_NOW:     shareMyLocationNow(); break;
           case ACT_TOGGLE:        handleToggle();      break;
           case ACT_MARK:          _wp.markHere();      break;
           case ACT_WAYPOINTS:     _wp.openList();      break;
@@ -138,7 +147,8 @@ public:
 
     if (c == KEY_CANCEL) {
       if (_cfg_dirty) { the_mesh.savePrefs(); _cfg_dirty = false; }
-      _task->gotoToolsScreen();
+      if (_return_home) _task->gotoHomeScreen();
+      else              _task->gotoToolsScreen();
       return true;
     }
     if (c == KEY_CONTEXT_MENU) { openActionMenu(); return true; }
@@ -276,6 +286,7 @@ private:
     // "Waypoints" opens the nav list — always available; it hosts the list,
     // backtrack (Trail-start row) and the "+ Add by coords" entry.
     pushAction(ACT_WAYPOINTS, "Waypoints...");
+    pushAction(ACT_SHARE_NOW,  "Share my pos");
     if (fileMenuHasItems()) pushAction(ACT_FILE, "Trail file...");
     pushAction(ACT_SETTINGS,  "Settings...");
   }
@@ -346,6 +357,17 @@ private:
   // The trail "Readout" row toggles speed vs pace; the metric/imperial unit
   // comes from the global Settings preference, so this is a plain on/off flip.
   void cycleUnits(NodePrefs* p, int /*dir*/) { p->trail_show_pace ^= 1; }
+
+  // One-shot manual share: build "[LOC]lat,lon" and hand it to the Messages
+  // screen, where the user picks a DM or channel recipient. (Auto live-share
+  // config lives in Tools › Live Share.)
+  void shareMyLocationNow() {
+    int32_t lat, lon;
+    if (!_task->currentLocation(lat, lon)) { _task->showAlert("No GPS fix", 1000); return; }
+    char text[40];
+    snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
+    _task->shareToMessage(text);
+  }
 
   // Render the average speed (or pace) in the globally-selected unit system.
   void formatAvgPaceOrSpeed(char* buf, size_t n, NodePrefs* p) const {
@@ -523,6 +545,13 @@ private:
       for (int i = 0; i < wp.count(); i++) fold(wp.at(i).lat_1e6, wp.at(i).lon_1e6);
     }
     if (have_gps) fold(my_lat, my_lon);
+    // Fold in live-tracked contacts ([LOC] shares) so they stay in frame.
+    {
+      LiveTrackStore& lt = _task->liveTrack();
+      uint32_t now = rtc_clock.getCurrentTime();
+      for (int i = 0; i < LiveTrackStore::CAPACITY; i++)
+        if (lt.isActive(i, now)) fold(lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6);
+    }
     return init;
   }
 
@@ -543,6 +572,23 @@ private:
       char s[3] = { w.label[0], w.label[0] ? w.label[1] : (char)0, 0 };
       drawWaypointLabel(display, s, wx, wy, area_x, area_y, area_w, area_h);
     }
+    // Live-tracked contacts ([LOC] shares): filled diamond + name initial,
+    // clamped to the frame like waypoints.
+    {
+      LiveTrackStore& lt = _task->liveTrack();
+      uint32_t now = rtc_clock.getCurrentTime();
+      for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
+        if (!lt.isActive(i, now)) continue;
+        const LiveTrackStore::Entry& s = lt.slotAt(i);
+        int cx, cy; proj.project(s.lat_1e6, s.lon_1e6, cx, cy);
+        if (cx < area_x) cx = area_x;  else if (cx > wp_x_max) cx = wp_x_max;
+        if (cy < area_y) cy = area_y;  else if (cy > wp_y_max) cy = wp_y_max;
+        drawContactMarker(display, cx, cy);
+        char s2[2] = { s.name[0], 0 };
+        drawWaypointLabel(display, s2, cx, cy, area_x, area_y, area_w, area_h);
+      }
+    }
+
     if (have_gps) {
       int mx, my; proj.project(my_lat, my_lon, mx, my);
       drawCurrentMarker(display, mx, my);
@@ -564,8 +610,9 @@ private:
     // when no trail is being recorded.
     int32_t my_lat, my_lon;
     const bool have_gps = ownPos(my_lat, my_lon);
+    const bool have_live = _task->liveTrack().active(rtc_clock.getCurrentTime()) > 0;
 
-    if (!have_trail && nwp == 0 && !have_gps) {
+    if (!have_trail && nwp == 0 && !have_gps && !have_live) {
       display.drawTextCentered(display.width() / 2, (top + bottom) / 2, "No GPS / no trail");
       return;
     }
@@ -803,5 +850,9 @@ private:
   }
   static void drawCurrentMarker(DisplayDriver& d, int cx, int cy) {
     miniIconDrawCentered(d, cx, cy, ICON_MAP_CURRENT);
+  }
+  // Filled diamond — a contact whose position arrived via a [LOC] share.
+  static void drawContactMarker(DisplayDriver& d, int cx, int cy) {
+    miniIconDrawCentered(d, cx, cy, ICON_MAP_CONTACT);
   }
 };

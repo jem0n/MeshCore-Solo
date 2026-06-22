@@ -44,6 +44,11 @@ class NearbyScreen : public UIScreen {
     // scan-source fields
     int8_t   rssi, snr_x4, remote_snr_x4;
     bool     is_known;
+    // live-track ([LOC] share) overlay: this row's position/age came from a
+    // shared-location message. live_verified == true for a DM (pubkey) share,
+    // false for a channel (name, best-effort) share.
+    bool     is_live;
+    bool     live_verified;
   };
 
   static const int MAX_NEARBY = 32;
@@ -178,10 +183,66 @@ class NearbyScreen : public UIScreen {
       e.contact_idx = i;
       e.lastmod     = ci.lastmod;
       e.is_known    = true;
+      e.is_live     = false;
+      e.live_verified = false;
     }
 
+    mergeLiveTrack();
     sortStored();
     clampSelection();
+  }
+
+  // Overlay live [LOC] shares onto the stored list: refresh a matching contact
+  // with the fresher shared position, and append senders who aren't contacts so
+  // a group sharing on a channel still shows up. DM shares match by pubkey
+  // prefix (verified); channel shares match by name (best-effort).
+  void mergeLiveTrack() {
+    if (!_task) return;
+    LiveTrackStore& lt = _task->liveTrack();
+    uint32_t now = rtc_clock.getCurrentTime();
+    for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
+      if (!lt.isActive(i, now)) continue;
+      const LiveTrackStore::Entry& s = lt.slotAt(i);
+
+      int m = -1;
+      for (int j = 0; j < _count; j++) {
+        if (s.verified && _entries[j].has_key
+            && memcmp(_entries[j].pub_key, s.key, LiveTrackStore::KEY_LEN) == 0) { m = j; break; }
+        if (!s.verified && strncmp(_entries[j].name, s.name, sizeof(_entries[j].name) - 1) == 0) { m = j; break; }
+      }
+
+      if (m >= 0) {
+        Entry& e = _entries[m];
+        // Only move the pin if the share is at least as recent as the contact's
+        // advert position, so a stale share can't override a fresher advert.
+        if (s.ts >= e.lastmod) {
+          e.lat_e6  = s.lat_1e6;
+          e.lon_e6  = s.lon_1e6;
+          e.dist_km = _own_gps ? geo::haversineKm(_own_lat, _own_lon, s.lat_1e6, s.lon_1e6) : -1.0f;
+          e.lastmod = s.ts;
+        }
+        e.is_live       = true;
+        e.live_verified = s.verified;
+      } else if (_count < MAX_NEARBY) {
+        Entry& e = _entries[_count++];
+        memset(&e, 0, sizeof(e));
+        strncpy(e.name, s.name, sizeof(e.name) - 1);
+        e.name[sizeof(e.name) - 1] = '\0';
+        // We only keep a key *prefix* for shares, not the full pubkey, so Ping
+        // and the base64 key view (which need 32 bytes) stay unavailable for a
+        // non-contact live entry. Navigate / Save-waypoint work off lat/lon.
+        e.has_key       = false;
+        e.type          = ADV_TYPE_CHAT;
+        e.lat_e6        = s.lat_1e6;
+        e.lon_e6        = s.lon_1e6;
+        e.dist_km       = _own_gps ? geo::haversineKm(_own_lat, _own_lon, s.lat_1e6, s.lon_1e6) : -1.0f;
+        e.lastmod       = s.ts;
+        e.contact_idx   = -1;
+        e.is_known      = false;
+        e.is_live       = true;
+        e.live_verified = s.verified;
+      }
+    }
   }
 
   void sortStored() {
@@ -223,6 +284,8 @@ class NearbyScreen : public UIScreen {
       e.dist_km = -1.0f;
       e.lastmod = 0;
       e.contact_idx = -1;
+      e.is_live = false;
+      e.live_verified = false;
     }
     // strongest first
     for (int i = 0; i < _count - 1; i++) {
@@ -367,7 +430,7 @@ class NearbyScreen : public UIScreen {
 
     buildSortLabel();
     _menu_action_count = 0;
-    _menu.begin("Options", 5);
+    _menu.begin("Options", 6);
     auto add = [&](const char* label, Action a) {
       _menu.addItem(label);
       _menu_actions[_menu_action_count++] = a;
@@ -428,7 +491,10 @@ class NearbyScreen : public UIScreen {
     display.setCursor(2, hdr + step * 3); display.print(buf);
     char age[16];
     fmtAge(age, sizeof(age), e.lastmod);
-    snprintf(buf, sizeof(buf), "Seen: %s", age);
+    // For a live [LOC] row, label the timestamp as a position share and note
+    // whether the sender's identity is verified (DM) or name-only (channel).
+    if (e.is_live) snprintf(buf, sizeof(buf), "Loc: %s %s", age, e.live_verified ? "(DM)" : "(chan~)");
+    else           snprintf(buf, sizeof(buf), "Seen: %s", age);
     display.drawTextEllipsized(2, hdr + step * 4, display.width() - 4, buf);
   }
 
@@ -589,7 +655,14 @@ public:
         display.drawSelectionRow(0, y - 1, display.width() - reserve, item_h - 1, sel);
 
         char filt[32];
-        display.translateUTF8ToBlocks(filt, e.name, sizeof(filt));
+        if (e.is_live) {
+          // Mark a live [LOC] row: '*' = verified DM share, '~' = channel share.
+          char nm[34];
+          snprintf(nm, sizeof(nm), "%s%s", e.live_verified ? "*" : "~", e.name);
+          display.translateUTF8ToBlocks(filt, nm, sizeof(filt));
+        } else {
+          display.translateUTF8ToBlocks(filt, e.name, sizeof(filt));
+        }
         if (_source == SRC_SCAN && !e.name[0]) {  // unknown node → "[Type]"
           snprintf(filt, sizeof(filt), "[%s]", typeName(e.type));
         }

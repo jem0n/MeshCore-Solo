@@ -24,6 +24,7 @@
 #include "../NodePrefs.h"
 #include "../Trail.h"
 #include "../Waypoint.h"
+#include "../LiveTrack.h"
 #include "KeyboardWidget.h"
 
 class UITask : public AbstractUITask {
@@ -77,6 +78,7 @@ class UITask : public AbstractUITask {
   UIScreen* nearby_screen;
   UIScreen* dashboard_config;
   UIScreen* auto_advert_screen;
+  UIScreen* live_share_screen;
   UIScreen* trail_screen;
   UIScreen* compass_screen;
   UIScreen* diag_screen;
@@ -85,7 +87,16 @@ class UITask : public AbstractUITask {
   CayenneLPP _dash_lpp;
   TrailStore _trail;
   WaypointStore _waypoints;
+  LiveTrackStore _livetrack;
   uint32_t _next_trail_sample_ms = 0;
+  uint32_t _next_livetrack_expire_ms = 0;
+
+  // Live location sharing engine state (auto [LOC] broadcast while moving).
+  uint32_t _next_loc_share_check_ms = 0;
+  uint32_t _loc_share_last_ms = 0;
+  int32_t  _loc_share_last_lat = 0, _loc_share_last_lon = 0;
+  bool     _loc_share_has_last = false;
+  bool     _loc_share_was_enabled = false;
 
   // Course-over-ground ring — a heading source independent of trail recording.
   // Filled from the same periodic GPS poll regardless of _trail.isActive().
@@ -145,6 +156,7 @@ public:
   void gotoQuickMsgScreen();
   void openContactDM(const ContactInfo& ci);
   void shareToMessage(const char* text);   // open Messages pre-loaded to share `text`
+  void pickLocShareTarget();               // open Messages to choose the live-share target
   int  getRecentDMContacts(uint8_t out[][NodePrefs::FAVOURITE_PREFIX_LEN], int max) const;
   void gotoToolsScreen();
   void gotoRingtoneEditor(int slot = 0);
@@ -152,12 +164,15 @@ public:
   void gotoNearbyScreen();
   void gotoDashboardConfig();
   void gotoAutoAdvertScreen();
+  void gotoLiveShareScreen();
   void gotoTrailScreen();
+  void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();
   void gotoDiagnosticsScreen();
   void gotoRepeaterScreen();
   TrailStore& trail() { return _trail; }
   WaypointStore& waypoints() { return _waypoints; }
+  LiveTrackStore& liveTrack() { return _livetrack; }
   // Shared on-screen keyboard — only one screen drives it at a time.
   KeyboardWidget& keyboard() { return _kb; }
   void saveWaypoints();
@@ -276,7 +291,13 @@ public:
   void msgRead(int msgcount) override;
   void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount, uint8_t contact_type = 0, const uint8_t* pub_key = nullptr) override;
   void notify(UIEventType t = UIEventType::none) override;
+  void onSharedLocation(const uint8_t* pub_key, const char* name,
+                        int32_t lat_1e6, int32_t lon_1e6,
+                        uint32_t ts, bool verified) override;
   void loop() override;
+  // Send one [LOC] message to the configured live-share target. Returns false
+  // if the target can't be resolved (no such channel / contact).
+  bool sendLocationShare(int32_t lat, int32_t lon);
 
   void shutdown(bool restart = false);
 };

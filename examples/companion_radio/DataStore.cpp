@@ -357,6 +357,24 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   rd(&_prefs.repeater_bw,          sizeof(_prefs.repeater_bw));
   rd(&_prefs.repeater_sf,          sizeof(_prefs.repeater_sf));
   rd(&_prefs.repeater_cr,          sizeof(_prefs.repeater_cr));
+  // → 0xC0DE0011: track_shared_loc. Pre-0x11 files leave a stray sentinel byte
+  // here; clamp so upgraders fall back to "off".
+  rd(&_prefs.track_shared_loc,     sizeof(_prefs.track_shared_loc));
+  if (_prefs.track_shared_loc > 1) _prefs.track_shared_loc = 0;
+  // → 0xC0DE0012: live location sharing. Pre-0x12 files leave stray bytes here;
+  // clamp each field back to its default so upgraders start with sharing off.
+  rd(&_prefs.loc_share_enabled,     sizeof(_prefs.loc_share_enabled));
+  rd(&_prefs.loc_share_target_type, sizeof(_prefs.loc_share_target_type));
+  rd(&_prefs.loc_share_channel_idx, sizeof(_prefs.loc_share_channel_idx));
+  rd(_prefs.loc_share_dm_prefix,    sizeof(_prefs.loc_share_dm_prefix));
+  rd(&_prefs.loc_share_move_idx,    sizeof(_prefs.loc_share_move_idx));
+  rd(&_prefs.loc_share_interval_idx, sizeof(_prefs.loc_share_interval_idx));
+  rd(&_prefs.loc_share_heartbeat_idx, sizeof(_prefs.loc_share_heartbeat_idx));
+  if (_prefs.loc_share_enabled > 1)     _prefs.loc_share_enabled = 0;
+  if (_prefs.loc_share_target_type > 1) _prefs.loc_share_target_type = 0;
+  if (_prefs.loc_share_move_idx >= NodePrefs::LOC_SHARE_MOVE_COUNT)         _prefs.loc_share_move_idx = 1;
+  if (_prefs.loc_share_interval_idx >= NodePrefs::LOC_SHARE_INTERVAL_COUNT) _prefs.loc_share_interval_idx = 1;
+  if (_prefs.loc_share_heartbeat_idx >= NodePrefs::LOC_SHARE_HEARTBEAT_COUNT) _prefs.loc_share_heartbeat_idx = 0;
   // Pre-0x10 files leave stray sentinel bytes here, same as a never-configured
   // device. Either way there's no valid saved profile, so default to a profile
   // in the same band as the companion's own network (_prefs.freq, already read
@@ -536,6 +554,14 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.repeater_bw,          sizeof(_prefs.repeater_bw));
     file.write((uint8_t *)&_prefs.repeater_sf,          sizeof(_prefs.repeater_sf));
     file.write((uint8_t *)&_prefs.repeater_cr,          sizeof(_prefs.repeater_cr));
+    file.write((uint8_t *)&_prefs.track_shared_loc,     sizeof(_prefs.track_shared_loc));
+    file.write((uint8_t *)&_prefs.loc_share_enabled,     sizeof(_prefs.loc_share_enabled));
+    file.write((uint8_t *)&_prefs.loc_share_target_type, sizeof(_prefs.loc_share_target_type));
+    file.write((uint8_t *)&_prefs.loc_share_channel_idx, sizeof(_prefs.loc_share_channel_idx));
+    file.write((uint8_t *)_prefs.loc_share_dm_prefix,    sizeof(_prefs.loc_share_dm_prefix));
+    file.write((uint8_t *)&_prefs.loc_share_move_idx,    sizeof(_prefs.loc_share_move_idx));
+    file.write((uint8_t *)&_prefs.loc_share_interval_idx, sizeof(_prefs.loc_share_interval_idx));
+    file.write((uint8_t *)&_prefs.loc_share_heartbeat_idx, sizeof(_prefs.loc_share_heartbeat_idx));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;

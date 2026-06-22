@@ -7,7 +7,7 @@ class ToolsScreen : public UIScreen {
   int _sel;
   int _scroll = 0;
 
-  static const int ITEM_COUNT = 8;
+  static const int ITEM_COUNT = 9;
   static const char* ITEMS[ITEM_COUNT];
 
 public:
@@ -35,12 +35,13 @@ public:
       if (_sel == 1) { _task->gotoBotScreen();        return true; }
       if (_sel == 2) { _task->gotoNearbyScreen();     return true; }
       if (_sel == 3) { _task->gotoAutoAdvertScreen(); return true; }
-      if (_sel == 4) { _task->gotoTrailScreen(); return true; }
-      if (_sel == 5) { _task->gotoCompassScreen(); return true; }
-      if (_sel == 6) { _task->gotoDiagnosticsScreen(); return true; }
-      if (_sel == 7) { _task->gotoRepeaterScreen(); return true; }
+      if (_sel == 4) { _task->gotoLiveShareScreen(); return true; }
+      if (_sel == 5) { _task->gotoTrailScreen(); return true; }
+      if (_sel == 6) { _task->gotoCompassScreen(); return true; }
+      if (_sel == 7) { _task->gotoDiagnosticsScreen(); return true; }
+      if (_sel == 8) { _task->gotoRepeaterScreen(); return true; }
     }
     return false;
   }
 };
-const char* ToolsScreen::ITEMS[8] = { "Ringtone Editor", "Auto-Reply Bot", "Nearby Nodes", "Auto-Advert", "Trail", "Compass", "Diagnostics", "Repeater" };
+const char* ToolsScreen::ITEMS[9] = { "Ringtone Editor", "Auto-Reply Bot", "Nearby Nodes", "Auto-Advert", "Live Share", "Trail", "Compass", "Diagnostics", "Repeater" };

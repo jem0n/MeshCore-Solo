@@ -123,6 +123,7 @@ static const int QUICK_MSGS_MAX = 10;
 #include "NearbyScreen.h"
 #include "DashboardConfigScreen.h"
 #include "AutoAdvertScreen.h"
+#include "LiveShareScreen.h"
 #include "TrailScreen.h"
 #include "CompassScreen.h"
 #include "DiagnosticsScreen.h"
@@ -240,6 +241,7 @@ class HomeScreen : public UIScreen {
     SENSORS,
 #endif
     SETTINGS,
+    MAP,
     TOOLS,
     QUICK_MSG,
     SHUTDOWN,
@@ -525,6 +527,65 @@ public:
     if (_shutdown_init && !_task->isButtonPressed()) {  // must wait for USR button to be released
       _task->shutdown();
     }
+  }
+
+  // Compact map preview for the Home "Map" page: own position, the GPS trail,
+  // and live-tracked contacts (◆) folded into one auto-scaled box. A simplified
+  // cousin of TrailScreen's map (dots, no grid/labels) so the home carousel
+  // stays light. Returns false (and draws nothing) when there's nothing to show.
+  bool drawMapPreview(DisplayDriver& display, int ax, int ay, int aw, int ah) {
+    if (aw < 8 || ah < 8) return false;
+    bool init = false;
+    int32_t mnla = 0, mxla = 0, mnlo = 0, mxlo = 0;
+    auto fold = [&](int32_t la, int32_t lo) {
+      if (!init) { mnla = mxla = la; mnlo = mxlo = lo; init = true; }
+      else { if (la < mnla) mnla = la; if (la > mxla) mxla = la;
+             if (lo < mnlo) mnlo = lo; if (lo > mxlo) mxlo = lo; }
+    };
+    TrailStore& tr = _task->trail();
+    if (!tr.empty()) { int32_t a, b, c, d; tr.boundingBox(a, b, c, d); fold(a, b); fold(c, d); }
+    LiveTrackStore& lt = _task->liveTrack();
+    uint32_t now = rtc_clock.getCurrentTime();
+    for (int i = 0; i < LiveTrackStore::CAPACITY; i++)
+      if (lt.isActive(i, now)) fold(lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6);
+    int32_t mla, mlo;
+    bool have_gps = _task->currentLocation(mla, mlo);
+    if (have_gps) fold(mla, mlo);
+    if (!init) return false;
+
+    int cx = ax + aw / 2, cy = ay + ah / 2;
+    // Degenerate: one coincident point — just centre the markers.
+    if (mnla == mxla && mnlo == mxlo) {
+      for (int i = 0; i < LiveTrackStore::CAPACITY; i++)
+        if (lt.isActive(i, now)) { miniIconDrawCentered(display, cx, cy, ICON_MAP_CONTACT); break; }
+      if (have_gps || !tr.empty()) miniIconDrawCentered(display, cx, cy, ICON_MAP_CURRENT);
+      return true;
+    }
+    float avg_lat_rad = ((mnla + mxla) / 2.0e6f) * (float)M_PI / 180.0f;
+    float lon_scale = cosf(avg_lat_rad); if (lon_scale < 0.05f) lon_scale = 0.05f;
+    float lat_span = (float)(mxla - mnla);
+    float lon_span = (float)(mxlo - mnlo) * lon_scale;
+    float slat = (float)ah / (lat_span > 0 ? lat_span : 1.0f);
+    float slon = (float)aw / (lon_span > 0 ? lon_span : 1.0f);
+    float scale = (slat < slon) ? slat : slon;
+    int off_x = ax + (aw - (int)(lon_span * scale)) / 2;
+    int off_y = ay + (ah - (int)(lat_span * scale)) / 2;
+    auto project = [&](int32_t la, int32_t lo, int& px, int& py) {
+      px = off_x + (int)((float)(lo - mnlo) * lon_scale * scale);
+      py = off_y + (int)((float)(mxla - la) * scale);
+    };
+    // Trail as dots (no line — gfx isn't available this early in the TU).
+    for (int i = 0; i < tr.count(); i++) {
+      int px, py; project(tr.at(i).lat_1e6, tr.at(i).lon_1e6, px, py);
+      display.fillRect(px, py, 1, 1);
+    }
+    for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
+      if (!lt.isActive(i, now)) continue;
+      int px, py; project(lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6, px, py);
+      miniIconDrawCentered(display, px, py, ICON_MAP_CONTACT);
+    }
+    if (have_gps) { int px, py; project(mla, mlo, px, py); miniIconDrawCentered(display, px, py, ICON_MAP_CURRENT); }
+    return true;
   }
 
   int render(DisplayDriver& display) override {
@@ -891,6 +952,23 @@ public:
       display.setTextSize(1);
       display.drawTextCentered(display.width() / 2, content_y, "Settings");
       display.drawTextCentered(display.width() / 2, content_y + step * 2, PRESS_LABEL " to open");
+    } else if (_page == HomePage::MAP) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.setTextSize(1);
+      // Mini-map preview filling the page, with one status line at the bottom.
+      int info_y = display.height() - step;
+      int area_h = info_y - content_y - 2;
+      bool drew = drawMapPreview(display, 2, content_y, display.width() - 4, area_h);
+      char info[40];
+      int32_t la, lo;
+      bool fix = _task->currentLocation(la, lo);
+      int trk = _task->liveTrack().active(rtc_clock.getCurrentTime());
+      snprintf(info, sizeof(info), "Fix:%s  Track:%d  %s",
+               fix ? "y" : "n", trk, PRESS_LABEL);
+      display.setColor(DisplayDriver::LIGHT);
+      if (!drew)
+        display.drawTextCentered(display.width() / 2, content_y + area_h / 2, "No GPS / no trail");
+      display.drawTextCentered(display.width() / 2, info_y, info);
     } else if (_page == HomePage::TOOLS) {
       display.setColor(DisplayDriver::LIGHT);
       display.setTextSize(1);
@@ -1127,6 +1205,10 @@ public:
       _task->gotoSettingsScreen();
       return true;
     }
+    if (c == KEY_ENTER && _page == HomePage::MAP) {
+      _task->gotoMapScreen();
+      return true;
+    }
     if (c == KEY_ENTER && _page == HomePage::TOOLS) {
       _task->gotoToolsScreen();
       return true;
@@ -1212,6 +1294,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   nearby_screen = new NearbyScreen(this);
   dashboard_config = new DashboardConfigScreen(this, node_prefs);
   auto_advert_screen = new AutoAdvertScreen(this, node_prefs);
+  live_share_screen = new LiveShareScreen(this, node_prefs);
   trail_screen       = new TrailScreen(this, &_trail);
   compass_screen     = new CompassScreen(this);
   diag_screen        = new DiagnosticsScreen(this);
@@ -1257,6 +1340,11 @@ void UITask::gotoTrailScreen() {
   setCurrScreen(trail_screen);
 }
 
+void UITask::gotoMapScreen() {
+  ((TrailScreen*)trail_screen)->enterMap();
+  setCurrScreen(trail_screen);
+}
+
 void UITask::gotoCompassScreen() {
   ((CompassScreen*)compass_screen)->enter();
   setCurrScreen(compass_screen);
@@ -1269,6 +1357,11 @@ void UITask::gotoDiagnosticsScreen() {
 void UITask::gotoRepeaterScreen() {
   ((RepeaterScreen*)repeater_screen)->enter();
   setCurrScreen(repeater_screen);
+}
+
+void UITask::gotoLiveShareScreen() {
+  ((LiveShareScreen*)live_share_screen)->enter();
+  setCurrScreen(live_share_screen);
 }
 
 void UITask::gotoAutoAdvertScreen() {
@@ -1361,6 +1454,11 @@ void UITask::openContactDM(const ContactInfo& ci) {
 
 void UITask::shareToMessage(const char* text) {
   ((QuickMsgScreen*)quick_msg)->startShare(text);
+  setCurrScreen(quick_msg);
+}
+
+void UITask::pickLocShareTarget() {
+  ((QuickMsgScreen*)quick_msg)->startPickTarget();
   setCurrScreen(quick_msg);
 }
 
@@ -1931,6 +2029,45 @@ void UITask::loop() {
     }
   }
 
+  // Live-track housekeeping — drop shared positions that have gone stale, so
+  // the Nearby "Live" view / map don't show ghosts. Cheap; once a minute.
+  if ((int32_t)(millis() - _next_livetrack_expire_ms) >= 0) {
+    _next_livetrack_expire_ms = millis() + 60000UL;
+    _livetrack.expire((uint32_t)rtc_clock.getCurrentTime());
+  }
+
+  // Live location sharing — periodically broadcast my [LOC] to the configured
+  // target while moving (Map › Live share). Movement-gated so a stationary
+  // device stays quiet unless a heartbeat is configured.
+  if (_node_prefs && _node_prefs->loc_share_enabled
+      && (int32_t)(millis() - _next_loc_share_check_ms) >= 0) {
+    _next_loc_share_check_ms = millis() + 2000UL;
+    if (!_loc_share_was_enabled) _loc_share_has_last = false;  // re-announce on enable
+    _loc_share_was_enabled = true;
+    int32_t lat, lon;
+    if (currentLocation(lat, lon)) {
+      uint16_t move_m = NodePrefs::locShareMoveMeters(_node_prefs->loc_share_move_idx);
+      uint16_t gap_s  = NodePrefs::locShareIntervalSecs(_node_prefs->loc_share_interval_idx);
+      uint16_t hb_s   = NodePrefs::locShareHeartbeatSecs(_node_prefs->loc_share_heartbeat_idx);
+      uint32_t now = millis();
+      bool first = !_loc_share_has_last;
+      float moved = first ? 1e9f
+                          : geo::haversineKm(_loc_share_last_lat, _loc_share_last_lon, lat, lon) * 1000.0f;
+      bool gap_ok = first || (now - _loc_share_last_ms) >= (uint32_t)gap_s * 1000UL;
+      bool hb_due = (hb_s > 0) && !first && (now - _loc_share_last_ms) >= (uint32_t)hb_s * 1000UL;
+      if ((moved >= (float)move_m && gap_ok) || first || hb_due) {
+        if (sendLocationShare(lat, lon)) {
+          _loc_share_last_lat = lat;
+          _loc_share_last_lon = lon;
+          _loc_share_last_ms  = now;
+          _loc_share_has_last = true;
+        }
+      }
+    }
+  } else if (_node_prefs && !_node_prefs->loc_share_enabled) {
+    _loc_share_was_enabled = false;
+  }
+
   // Course-over-ground sampling — every ~1 s regardless of trail state, so the
   // heading is available to navigation even when not recording a trail.
   if ((int32_t)(millis() - _next_cog_sample_ms) >= 0) {
@@ -1995,6 +2132,33 @@ bool UITask::currentLocation(int32_t& lat, int32_t& lon) const {
     return true;
   }
   return false;
+}
+
+// A peer broadcast its position via a [LOC] message (parsed in MyMesh). Record
+// it in the live-track table for the Nearby "Live" view / map. Gated on the
+// user preference so it stays opt-in.
+void UITask::onSharedLocation(const uint8_t* pub_key, const char* name,
+                              int32_t lat_1e6, int32_t lon_1e6,
+                              uint32_t ts, bool verified) {
+  if (!_node_prefs || !_node_prefs->track_shared_loc) return;
+  _livetrack.update(pub_key, name, lat_1e6, lon_1e6, ts, verified);
+}
+
+bool UITask::sendLocationShare(int32_t lat, int32_t lon) {
+  if (!_node_prefs) return false;
+  char text[40];
+  snprintf(text, sizeof(text), LOCATION_MSG_TAG "%.5f,%.5f", lat / 1e6, lon / 1e6);
+  if (_node_prefs->loc_share_target_type == 0) {
+    ChannelDetails ch;
+    if (!the_mesh.getChannel(_node_prefs->loc_share_channel_idx, ch)) return false;
+    return the_mesh.sendGroupMessage(rtc_clock.getCurrentTime(), ch.channel,
+                                     the_mesh.getNodeName(), text, strlen(text));
+  }
+  ContactInfo* c = the_mesh.lookupContactByPubKey(_node_prefs->loc_share_dm_prefix,
+                                                  NodePrefs::FAVOURITE_PREFIX_LEN);
+  if (!c) return false;
+  uint32_t expected_ack = 0, est_timeout = 0;
+  return the_mesh.sendMessage(*c, rtc_clock.getCurrentTime(), 0, text, expected_ack, est_timeout) > 0;
 }
 
 void UITask::saveWaypoints() {

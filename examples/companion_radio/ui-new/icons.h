@@ -193,6 +193,12 @@ MINI_ICON(ICON_MAP_CURRENT, 5,    // ✕ live position / last trail point
   packRow("..#.."),
   packRow(".#.#."),
   packRow("#...#"));
+MINI_ICON(ICON_MAP_CONTACT, 5,    // ◆ filled diamond — a live-tracked contact ([LOC] share)
+  packRow("..#.."),
+  packRow(".###."),
+  packRow("#####"),
+  packRow(".###."),
+  packRow("..#.."));
 MINI_ICON(ICON_MAP_NORTH, 5,      // "N" with a peaked roof — compass north marker
   packRow("..#.."),
   packRow(".###."),

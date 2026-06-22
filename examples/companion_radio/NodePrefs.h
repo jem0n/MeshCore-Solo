@@ -219,11 +219,45 @@ struct NodePrefs {  // persisted to file
   uint8_t  repeater_sf;
   uint8_t  repeater_cr;
 
+  // Track positions shared by other nodes via [LOC] messages (LiveTrackStore).
+  // 0 = ignore shared positions (default), 1 = parse incoming DM/channel [LOC]
+  // shares and update the live-track table (Nearby "Live" view / map).
+  uint8_t  track_shared_loc;
+
+  // Live location sharing — a message-based "beacon". When enabled, the device
+  // periodically sends a [LOC] message to the chosen target while it moves.
+  // Configured from the Map (Trail screen) "Live share" menu.
+  uint8_t  loc_share_enabled;       // 0=off (default), 1=auto-sharing on
+  uint8_t  loc_share_target_type;   // 0=channel, 1=DM contact
+  uint8_t  loc_share_channel_idx;   // target channel index (when target_type==0)
+  uint8_t  loc_share_dm_prefix[6];  // target contact pubkey prefix (when target_type==1)
+  uint8_t  loc_share_move_idx;      // movement gate level (index into locShareMoveMeters)
+  uint8_t  loc_share_interval_idx;  // min send interval (index into locShareIntervalSecs)
+  uint8_t  loc_share_heartbeat_idx; // stationary heartbeat (index into locShareHeartbeatSecs)
+
+  // Single source of truth for the live-share option tables (shared by the Map
+  // UI labels and the auto-send engine in UITask).
+  static const uint8_t LOC_SHARE_MOVE_COUNT = 4;
+  static uint16_t locShareMoveMeters(uint8_t idx) {
+    static const uint16_t M[LOC_SHARE_MOVE_COUNT] = { 50, 100, 250, 500 };
+    return M[idx < LOC_SHARE_MOVE_COUNT ? idx : 1];
+  }
+  static const uint8_t LOC_SHARE_INTERVAL_COUNT = 4;
+  static uint16_t locShareIntervalSecs(uint8_t idx) {
+    static const uint16_t S[LOC_SHARE_INTERVAL_COUNT] = { 30, 60, 120, 300 };
+    return S[idx < LOC_SHARE_INTERVAL_COUNT ? idx : 1];
+  }
+  static const uint8_t LOC_SHARE_HEARTBEAT_COUNT = 3;
+  static uint16_t locShareHeartbeatSecs(uint8_t idx) {
+    static const uint16_t H[LOC_SHARE_HEARTBEAT_COUNT] = { 0, 300, 900 };  // off / 5 min / 15 min
+    return H[idx < LOC_SHARE_HEARTBEAT_COUNT ? idx : 0];
+  }
+
   // Tail sentinel written at the end of /new_prefs. Bump the low byte when
   // adding/removing/reordering fields in DataStore::savePrefs/loadPrefsInt so
   // older saves are detected on load and skipped (zero-init defaults kept).
   // High 24 bits identify the file format; low byte is the schema revision.
-  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0010;
+  static const uint32_t SCHEMA_SENTINEL = 0xC0DE0012;
 
   // Bit-index for each home page. Used by page_order (entries store bit+1) and
   // by home_pages_mask. Single source of truth — both HomeScreen::pageBit/bitToPage
