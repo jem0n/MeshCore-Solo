@@ -215,17 +215,19 @@ class NearbyScreen : public UIScreen {
 
       if (m >= 0) {
         Entry& e = _entries[m];
-        // Only move the pin if the share is at least as recent as the contact's
-        // advert position, so a stale share can't override a fresher advert.
-        if (s.ts >= e.lastmod) {
-          e.lat_e6  = s.lat_1e6;
-          e.lon_e6  = s.lon_1e6;
-          e.dist_km = _own_gps ? geo::haversineKm(_own_lat, _own_lon, s.lat_1e6, s.lon_1e6) : -1.0f;
-          e.lastmod = s.ts;
-        }
+        // A [LOC] share is an explicit "here I am now", so it defines the pin and
+        // the distance (used for proximity sorting). Recency for the time sort is
+        // the most recent of the advert and the share.
+        e.lat_e6  = s.lat_1e6;
+        e.lon_e6  = s.lon_1e6;
+        e.dist_km = _own_gps ? geo::haversineKm(_own_lat, _own_lon, s.lat_1e6, s.lon_1e6) : -1.0f;
+        if (s.ts > e.lastmod) e.lastmod = s.ts;
         e.is_live       = true;
         e.live_verified = s.verified;
-      } else if (_count < MAX_NEARBY) {
+      } else if (_count < MAX_NEARBY && typeMatchesFilter(ADV_TYPE_CHAT, 0, false)) {
+        // A sender we don't have as a contact: treat it as a companion (the only
+        // node type that shares position), so the type filter still applies —
+        // e.g. it must not appear under the Repeater/Room/Sensor filters.
         Entry& e = _entries[_count++];
         memset(&e, 0, sizeof(e));
         strncpy(e.name, s.name, sizeof(e.name) - 1);
