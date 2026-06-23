@@ -79,7 +79,7 @@ class UITask : public AbstractUITask {
   UIScreen* dashboard_config;
   UIScreen* auto_advert_screen;
   UIScreen* live_share_screen;
-  UIScreen* geo_alert_screen;
+  UIScreen* locator_screen;
   UIScreen* trail_screen;
   UIScreen* compass_screen;
   UIScreen* diag_screen;
@@ -106,20 +106,20 @@ class UITask : public AbstractUITask {
   bool     _trail_pause_has_ref = false;
   uint32_t _trail_last_move_ms = 0;
 
-  // Geo-alert engine state. _geo_alert_known guards the first evaluation after
+  // Locator engine state. _locator_known guards the first evaluation after
   // arming (initialise inside/outside silently, fire only on later crossings).
-  uint32_t _next_geo_alert_ms = 0;
-  bool     _geo_alert_inside = false;
-  bool     _geo_alert_known = false;
+  uint32_t _next_locator_ms = 0;
+  bool     _locator_inside = false;
+  bool     _locator_known = false;
   // Proximity beeper: ticks while inside the radius, faster the nearer the
-  // target. _geo_beep_check_ms throttles the distance poll; _geo_beep_next_ms
+  // target. _locator_beep_check_ms throttles the distance poll; _locator_beep_next_ms
   // is when the next tick is due.
-  uint32_t _geo_beep_check_ms = 0;
-  uint32_t _geo_beep_next_ms = 0;
-  bool geoAlertDistance(float& dist_m, float& radius_m) const;
-  void evaluateGeoAlert();
-  void fireGeoAlert(bool arrived);
-  void geoProximityBeeper();
+  uint32_t _locator_beep_check_ms = 0;
+  uint32_t _locator_beep_next_ms = 0;
+  bool locatorDistance(float& dist_m, float& radius_m) const;
+  void evaluateLocator();
+  void fireLocator(bool arrived);
+  void locatorProximityBeeper();
 
   // Course-over-ground ring — a heading source independent of trail recording.
   // Filled from the same periodic GPS poll regardless of _trail.isActive().
@@ -189,11 +189,11 @@ public:
   void gotoDashboardConfig();
   void gotoAutoAdvertScreen();
   void gotoLiveShareScreen();
-  void gotoGeoAlertScreen();
-  // Re-arm the geo-alert state machine so the next evaluation initialises
-  // silently (called by the Geo Alert tool after the target/radius changes,
+  void gotoLocatorScreen();
+  // Re-arm the locator state machine so the next evaluation initialises
+  // silently (called by the Locator tool after the target/radius changes,
   // so re-entering the zone doesn't fire on a stale inside/outside state).
-  void resetGeoAlert() { _geo_alert_known = false; }
+  void resetLocator() { _locator_known = false; }
   void gotoTrailScreen();
   void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();

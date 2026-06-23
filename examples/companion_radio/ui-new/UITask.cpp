@@ -124,7 +124,7 @@ static const int QUICK_MSGS_MAX = 10;
 #include "DashboardConfigScreen.h"
 #include "AutoAdvertScreen.h"
 #include "LiveShareScreen.h"
-#include "GeoAlertScreen.h"
+#include "LocatorScreen.h"
 #include "TrailScreen.h"
 #include "CompassScreen.h"
 #include "DiagnosticsScreen.h"
@@ -1423,7 +1423,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   dashboard_config = new DashboardConfigScreen(this, node_prefs);
   auto_advert_screen = new AutoAdvertScreen(this, node_prefs);
   live_share_screen = new LiveShareScreen(this, node_prefs);
-  geo_alert_screen  = new GeoAlertScreen(this, node_prefs);
+  locator_screen  = new LocatorScreen(this, node_prefs);
   trail_screen       = new TrailScreen(this, &_trail);
   compass_screen     = new CompassScreen(this);
   diag_screen        = new DiagnosticsScreen(this);
@@ -1494,9 +1494,9 @@ void UITask::gotoLiveShareScreen() {
   setCurrScreen(live_share_screen);
 }
 
-void UITask::gotoGeoAlertScreen() {
-  ((GeoAlertScreen*)geo_alert_screen)->enter();
-  setCurrScreen(geo_alert_screen);
+void UITask::gotoLocatorScreen() {
+  ((LocatorScreen*)locator_screen)->enter();
+  setCurrScreen(locator_screen);
 }
 
 void UITask::gotoAutoAdvertScreen() {
@@ -2240,70 +2240,70 @@ void UITask::loop() {
     }
   }
 
-  // Geo-alert — beep + alert when the device crosses into / out of the armed
+  // Locator — beep + alert when the device crosses into / out of the armed
   // geofence. Cheap; a few seconds of latency at the boundary is fine.
-  if ((int32_t)(millis() - _next_geo_alert_ms) >= 0) {
-    _next_geo_alert_ms = millis() + 3000UL;
-    evaluateGeoAlert();
+  if ((int32_t)(millis() - _next_locator_ms) >= 0) {
+    _next_locator_ms = millis() + 3000UL;
+    evaluateLocator();
   }
 
-  // Geo-alert proximity beeper — ticks faster the closer to the target. Runs on
+  // Locator proximity beeper — ticks faster the closer to the target. Runs on
   // its own short cadence (the crossing check above is too coarse for this).
-  geoProximityBeeper();
+  locatorProximityBeeper();
 }
 
 // Evaluate the single geofence against the current GPS fix. Crossing the radius
-// fires fireGeoAlert() according to the configured mode; a hysteresis band on
+// fires fireLocator() according to the configured mode; a hysteresis band on
 // the "leave" edge stops it chattering at the boundary, and the first reading
 // after arming only seeds the inside/outside state (no spurious alert).
-// Distance (m) from the current GPS fix to the geo-alert target, plus the
+// Distance (m) from the current GPS fix to the locator target, plus the
 // configured radius (m). Returns false when no target is set or there's no fix
 // — the single place the target-distance maths lives, shared by the crossing
 // evaluator and the proximity beeper.
-bool UITask::geoAlertDistance(float& dist_m, float& radius_m) const {
-  if (!_node_prefs || !_node_prefs->geo_alert_has_target) return false;
+bool UITask::locatorDistance(float& dist_m, float& radius_m) const {
+  if (!_node_prefs || !_node_prefs->locator_has_target) return false;
   int32_t tlat, tlon;
-  if (_node_prefs->geo_alert_target_kind == 1) {
+  if (_node_prefs->locator_target_kind == 1) {
     // Live contact: follow the latest [LOC] position. No recent share → no
     // distance to evaluate (engine waits rather than using a stale fix).
     const LiveTrackStore::Entry* e =
-        _livetrack.activeByKey(_node_prefs->geo_alert_key, (uint32_t)rtc_clock.getCurrentTime());
+        _livetrack.activeByKey(_node_prefs->locator_key, (uint32_t)rtc_clock.getCurrentTime());
     if (!e) return false;
     tlat = e->lat_1e6; tlon = e->lon_1e6;
   } else {
-    tlat = _node_prefs->geo_alert_lat_1e6; tlon = _node_prefs->geo_alert_lon_1e6;
+    tlat = _node_prefs->locator_lat_1e6; tlon = _node_prefs->locator_lon_1e6;
   }
   int32_t lat, lon;
   if (!currentLocation(lat, lon)) return false;
   dist_m   = geo::haversineKm(lat, lon, tlat, tlon) * 1000.0f;
-  radius_m = (float)NodePrefs::geoAlertRadiusMeters(_node_prefs->geo_alert_radius_idx);
+  radius_m = (float)NodePrefs::locatorRadiusMeters(_node_prefs->locator_radius_idx);
   return true;
 }
 
-void UITask::evaluateGeoAlert() {
-  if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_has_target) {
-    _geo_alert_known = false;
+void UITask::evaluateLocator() {
+  if (!_node_prefs || !_node_prefs->locator_enabled || !_node_prefs->locator_has_target) {
+    _locator_known = false;
     return;
   }
   float dist, r;
-  if (!geoAlertDistance(dist, r)) return;   // armed but no fix yet — keep state
+  if (!locatorDistance(dist, r)) return;   // armed but no fix yet — keep state
   bool inside;
-  if (!_geo_alert_known)        inside = dist <= r;            // seed state
-  else if (_geo_alert_inside)   inside = dist <= r * 1.25f;    // leave past band
+  if (!_locator_known)        inside = dist <= r;            // seed state
+  else if (_locator_inside)   inside = dist <= r * 1.25f;    // leave past band
   else                          inside = dist <= r;            // arrive at edge
 
-  if (_geo_alert_known && inside != _geo_alert_inside) {
-    uint8_t mode = _node_prefs->geo_alert_mode;  // 0=arrive,1=leave,2=both
+  if (_locator_known && inside != _locator_inside) {
+    uint8_t mode = _node_prefs->locator_mode;  // 0=arrive,1=leave,2=both
     bool fire = inside ? (mode == 0 || mode == 2) : (mode == 1 || mode == 2);
-    if (fire) fireGeoAlert(inside);
+    if (fire) fireLocator(inside);
   }
-  _geo_alert_inside = inside;
-  _geo_alert_known  = true;
+  _locator_inside = inside;
+  _locator_known  = true;
 }
 
-void UITask::fireGeoAlert(bool arrived) {
-  const char* lbl = _node_prefs->geo_alert_label[0] ? _node_prefs->geo_alert_label : "target";
-  bool person = _node_prefs->geo_alert_target_kind == 1;
+void UITask::fireLocator(bool arrived) {
+  const char* lbl = _node_prefs->locator_label[0] ? _node_prefs->locator_label : "target";
+  bool person = _node_prefs->locator_target_kind == 1;
   char msg[40];
   // "Near/Away" reads naturally for a moving person; "Arrived/Left" for a place.
   snprintf(msg, sizeof(msg),
@@ -2311,37 +2311,37 @@ void UITask::fireGeoAlert(bool arrived) {
                    : (person ? "Away: %s"  : "Left: %s"), lbl);
   showAlert(msg, 3000);
   if (!isBuzzerQuiet())
-    playMelody(arrived ? "geoarr:d=8,o=6,b=140:c,e,g" : "geolv:d=8,o=6,b=140:g,e,c");
+    playMelody(arrived ? "locarr:d=8,o=6,b=140:c,e,g" : "loclv:d=8,o=6,b=140:g,e,c");
 }
 
 // Homing beeper: while armed with a target and inside the radius, emit a short
 // tick whose interval shrinks linearly with distance — slow at the edge, rapid
 // near the centre. Polls distance a few times a second; silent outside the
-// radius. The beeper has its own toggle (geo_alert_beeper), so turning it on is
+// radius. The beeper has its own toggle (locator_beeper), so turning it on is
 // an explicit "I want to hear this" — it deliberately overrides the global
 // buzzer mute (playMelody → buzzer.playForced ignores the quiet flag).
-void UITask::geoProximityBeeper() {
+void UITask::locatorProximityBeeper() {
   static const uint32_t BEEP_MIN_MS = 150;    // fastest cadence (at the target)
   static const uint32_t BEEP_MAX_MS = 2000;   // slowest cadence (at the edge)
-  if (!_node_prefs || !_node_prefs->geo_alert_enabled || !_node_prefs->geo_alert_beeper
-      || !_node_prefs->geo_alert_has_target) {
+  if (!_node_prefs || !_node_prefs->locator_enabled || !_node_prefs->locator_beeper
+      || !_node_prefs->locator_has_target) {
     return;
   }
-  if ((int32_t)(millis() - _geo_beep_check_ms) < 0) return;
-  _geo_beep_check_ms = millis() + 250UL;
+  if ((int32_t)(millis() - _locator_beep_check_ms) < 0) return;
+  _locator_beep_check_ms = millis() + 250UL;
 
   float dist, r;
-  if (!geoAlertDistance(dist, r)) return;
+  if (!locatorDistance(dist, r)) return;
   if (dist > r) {                       // outside the zone: stay quiet, beep on re-entry
-    _geo_beep_next_ms = millis();
+    _locator_beep_next_ms = millis();
     return;
   }
-  if ((int32_t)(millis() - _geo_beep_next_ms) < 0) return;
+  if ((int32_t)(millis() - _locator_beep_next_ms) < 0) return;
   float frac = (r > 0) ? dist / r : 0;  // 0 at centre, 1 at edge
   if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
   uint32_t interval = BEEP_MIN_MS + (uint32_t)(frac * (BEEP_MAX_MS - BEEP_MIN_MS));
-  playMelody("geop:d=32,o=7,b=200:c");
-  _geo_beep_next_ms = millis() + interval;
+  playMelody("locp:d=32,o=7,b=200:c");
+  _locator_beep_next_ms = millis() + interval;
 }
 
 // Insert a GPS fix into the course-over-ground ring, rejecting gross outliers

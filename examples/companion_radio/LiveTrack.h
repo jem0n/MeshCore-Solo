@@ -79,7 +79,7 @@ public:
   }
 
   // Latest active position for a verified (DM/pubkey) share, or null if that
-  // node hasn't shared recently. Used by the geo-alert engine to follow a
+  // node hasn't shared recently. Used by the locator engine to follow a
   // moving contact.
   const Entry* activeByKey(const uint8_t* key, uint32_t now) const {
     if (!key) return nullptr;

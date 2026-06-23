@@ -8,7 +8,7 @@
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
 
-The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, geo-alert, compass, device diagnostics, and repeater mode. Tools are grouped into collapsible **Location** / **Comms** / **System** sections — the same fold-in-place model as Settings; Tools always opens folded back to the section list. Navigate with **UP/DOWN**, press **Enter** on a section header to expand or collapse it, or on a tool to open it.
+The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, locator, compass, device diagnostics, and repeater mode. Tools are grouped into collapsible **Location** / **Comms** / **System** sections — the same fold-in-place model as Settings; Tools always opens folded back to the section list. Navigate with **UP/DOWN**, press **Enter** on a section header to expand or collapse it, or on a tool to open it.
 
 ---
 
@@ -225,7 +225,7 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 ---
 
-## Geo Alert
+## Locator
 
 A single **geofence** that beeps and shows an alert when you cross **into** or **out of** a radius. The target can be a **saved waypoint** (a fixed place — "tell me when I'm back at camp") or a **live contact** (a person sharing their position via Live Share — "alert me when my friend gets near / falls behind"). A waypoint target is a **snapshot** (coordinate + label copied), so it keeps working even if you later edit or delete that waypoint; a contact target follows the person's latest shared position.
 
@@ -246,7 +246,7 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 **Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius. Because the beeper is its own opt-in toggle, turning it on **overrides the global buzzer mute** (**Settings › Sound › Buzzer**) — it's an explicit "I want to hear this". It works independently of the arrive/leave crossing alert (which does follow the mute), so you can use either or both.
 
 > [!TIP]
-> Mark the spot first with **Tools › Trail → Hold Enter → Mark here** (or **+ Add by coords**), then set it as the Geo Alert target.
+> Mark the spot first with **Tools › Trail → Hold Enter → Mark here** (or **+ Add by coords**), then set it as the Locator target.
 
 ---
 

@@ -1,11 +1,11 @@
 #pragma once
-// Geo-alert config tool. Tools › Geo Alert.
+// Locator config tool. Tools › Locator.
 // A single geofence whose target is either a saved waypoint (a place) or a
 // person — a favourite/contact or a live [LOC] sender, keyed by pubkey prefix.
 // When armed the device beeps / alerts as it crosses into (arrive/near) or out
 // of (leave/away) the radius. A waypoint target is snapshotted (coord + label);
 // a person target follows their latest shared position. The crossing engine
-// lives in UITask::evaluateGeoAlert(). The Target row's Enter opens a picker
+// lives in UITask::evaluateLocator(). The Target row's Enter opens a picker
 // (favourites first, then active live senders, then waypoints); LEFT/RIGHT
 // quick-cycles the same set.
 // Included by UITask.cpp after LiveShareScreen.h.
@@ -15,7 +15,7 @@
 #include "../LiveTrack.h"
 #include "icons.h"   // drawList (shared scrolling-list helper)
 
-class GeoAlertScreen : public UIScreen {
+class LocatorScreen : public UIScreen {
   UITask*    _task;
   NodePrefs* _prefs;
   bool       _dirty  = false;
@@ -46,36 +46,36 @@ class GeoAlertScreen : public UIScreen {
   }
 
 public:
-  GeoAlertScreen(UITask* task, NodePrefs* prefs) : _task(task), _prefs(prefs) {}
+  LocatorScreen(UITask* task, NodePrefs* prefs) : _task(task), _prefs(prefs) {}
 
   void enter() { _dirty = false; _sel = 0; _scroll = 0; _picking = false; }
 
   void valueLabel(Kind k, char* buf, int n) {
     switch (k) {
       case K_ENABLE:
-        snprintf(buf, n, "%s", (_prefs && _prefs->geo_alert_enabled) ? "ON" : "OFF");
+        snprintf(buf, n, "%s", (_prefs && _prefs->locator_enabled) ? "ON" : "OFF");
         break;
       case K_TARGET:
-        if (_prefs && _prefs->geo_alert_has_target) {
-          const char* nm = _prefs->geo_alert_label[0] ? _prefs->geo_alert_label : "(unnamed)";
+        if (_prefs && _prefs->locator_has_target) {
+          const char* nm = _prefs->locator_label[0] ? _prefs->locator_label : "(unnamed)";
           // '@' prefix marks a live contact target (a moving person) vs a waypoint.
-          if (_prefs->geo_alert_target_kind == 1) snprintf(buf, n, "@%s", nm);
+          if (_prefs->locator_target_kind == 1) snprintf(buf, n, "@%s", nm);
           else                                    snprintf(buf, n, "%s", nm);
         } else {
           snprintf(buf, n, "none");
         }
         break;
       case K_RADIUS: {
-        uint16_t r = NodePrefs::geoAlertRadiusMeters(_prefs ? _prefs->geo_alert_radius_idx : 1);
+        uint16_t r = NodePrefs::locatorRadiusMeters(_prefs ? _prefs->locator_radius_idx : 1);
         if (r < 1000) snprintf(buf, n, "%um", (unsigned)r);
         else          snprintf(buf, n, "%.1fkm", r / 1000.0f);
         break;
       }
       case K_MODE:
-        snprintf(buf, n, "%s", NodePrefs::geoAlertModeLabel(_prefs ? _prefs->geo_alert_mode : 0));
+        snprintf(buf, n, "%s", NodePrefs::locatorModeLabel(_prefs ? _prefs->locator_mode : 0));
         break;
       case K_BEEPER:
-        snprintf(buf, n, "%s", (_prefs && _prefs->geo_alert_beeper) ? "ON" : "OFF");
+        snprintf(buf, n, "%s", (_prefs && _prefs->locator_beeper) ? "ON" : "OFF");
         break;
       default: buf[0] = '\0';
     }
@@ -85,7 +85,7 @@ public:
     display.setTextSize(1);
     display.setColor(DisplayDriver::LIGHT);
     if (_picking) { renderPicker(display); return 400; }
-    display.drawCenteredHeader("GEO ALERT");
+    display.drawCenteredHeader("LOCATOR");
 
     const int valx = display.width() / 2 + 6;
     drawList(display, ROW_COUNT, _sel, _scroll, [&](int i, int y, bool sel, int reserve) {
@@ -106,8 +106,8 @@ public:
     if (!_prefs) return;
     switch (rows(_sel).kind) {
       case K_ENABLE:
-        _prefs->geo_alert_enabled ^= 1;
-        if (_prefs->geo_alert_enabled && !_prefs->geo_alert_has_target)
+        _prefs->locator_enabled ^= 1;
+        if (_prefs->locator_enabled && !_prefs->locator_has_target)
           _task->showAlert("Pick a target", 1200);
         _dirty = true;
         break;
@@ -115,23 +115,23 @@ public:
         cycleTarget(dir);
         break;
       case K_RADIUS:
-        _prefs->geo_alert_radius_idx = (uint8_t)((_prefs->geo_alert_radius_idx
-            + (dir >= 0 ? 1 : NodePrefs::GEO_ALERT_RADIUS_COUNT - 1)) % NodePrefs::GEO_ALERT_RADIUS_COUNT);
+        _prefs->locator_radius_idx = (uint8_t)((_prefs->locator_radius_idx
+            + (dir >= 0 ? 1 : NodePrefs::LOCATOR_RADIUS_COUNT - 1)) % NodePrefs::LOCATOR_RADIUS_COUNT);
         _dirty = true;
         break;
       case K_MODE:
-        _prefs->geo_alert_mode = (uint8_t)((_prefs->geo_alert_mode
-            + (dir >= 0 ? 1 : NodePrefs::GEO_ALERT_MODE_COUNT - 1)) % NodePrefs::GEO_ALERT_MODE_COUNT);
+        _prefs->locator_mode = (uint8_t)((_prefs->locator_mode
+            + (dir >= 0 ? 1 : NodePrefs::LOCATOR_MODE_COUNT - 1)) % NodePrefs::LOCATOR_MODE_COUNT);
         _dirty = true;
         break;
       case K_BEEPER:
-        _prefs->geo_alert_beeper ^= 1;
+        _prefs->locator_beeper ^= 1;
         _dirty = true;
         break;
     }
     // Re-seed the crossing engine after any change so editing the target/radius
     // while armed can't fire a stale arrive/leave before the screen is closed.
-    _task->resetGeoAlert();
+    _task->resetLocator();
   }
 
   // Build the selectable target set into _targets: favourites first (the quick
@@ -179,25 +179,25 @@ public:
   // Index of the currently-configured target within _targets, or -1.
   int currentTargetIndex() const {
     for (int i = 0; i < _target_n; i++) {
-      if (_targets[i].kind == 1 && _prefs->geo_alert_target_kind == 1) {
-        if (memcmp(_targets[i].key, _prefs->geo_alert_key, 6) == 0) return i;
-      } else if (_targets[i].kind == 0 && _prefs->geo_alert_target_kind == 0) {
-        if (_targets[i].lat == _prefs->geo_alert_lat_1e6 &&
-            _targets[i].lon == _prefs->geo_alert_lon_1e6) return i;
+      if (_targets[i].kind == 1 && _prefs->locator_target_kind == 1) {
+        if (memcmp(_targets[i].key, _prefs->locator_key, 6) == 0) return i;
+      } else if (_targets[i].kind == 0 && _prefs->locator_target_kind == 0) {
+        if (_targets[i].lat == _prefs->locator_lat_1e6 &&
+            _targets[i].lon == _prefs->locator_lon_1e6) return i;
       }
     }
     return -1;
   }
 
   void applyTarget(const Target& t) {
-    _prefs->geo_alert_target_kind = t.kind;
-    if (t.kind == 1) memcpy(_prefs->geo_alert_key, t.key, 6);
-    _prefs->geo_alert_lat_1e6 = t.lat;
-    _prefs->geo_alert_lon_1e6 = t.lon;
-    snprintf(_prefs->geo_alert_label, sizeof(_prefs->geo_alert_label), "%s", t.name);
-    _prefs->geo_alert_has_target = 1;
+    _prefs->locator_target_kind = t.kind;
+    if (t.kind == 1) memcpy(_prefs->locator_key, t.key, 6);
+    _prefs->locator_lat_1e6 = t.lat;
+    _prefs->locator_lon_1e6 = t.lon;
+    snprintf(_prefs->locator_label, sizeof(_prefs->locator_label), "%s", t.name);
+    _prefs->locator_has_target = 1;
     _dirty = true;
-    _task->resetGeoAlert();
+    _task->resetLocator();
   }
 
   // LEFT/RIGHT quick-cycle over the same set the picker shows.

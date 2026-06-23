@@ -13,7 +13,7 @@ class ToolsScreen : public UIScreen {
   UITask* _task;
 
   enum Action {
-    ACT_NEARBY, ACT_LIVESHARE, ACT_TRAIL, ACT_GEOALERT, ACT_COMPASS,
+    ACT_NEARBY, ACT_LIVESHARE, ACT_TRAIL, ACT_LOCATOR, ACT_COMPASS,
     ACT_BOT, ACT_AUTOADVERT, ACT_REPEATER,
     ACT_RINGTONE, ACT_DIAGNOSTICS
   };
@@ -44,7 +44,7 @@ class ToolsScreen : public UIScreen {
       case ACT_NEARBY:      _task->gotoNearbyScreen();      break;
       case ACT_LIVESHARE:   _task->gotoLiveShareScreen();   break;
       case ACT_TRAIL:       _task->gotoTrailScreen();       break;
-      case ACT_GEOALERT:    _task->gotoGeoAlertScreen();    break;
+      case ACT_LOCATOR:     _task->gotoLocatorScreen();     break;
       case ACT_COMPASS:     _task->gotoCompassScreen();     break;
       case ACT_BOT:         _task->gotoBotScreen();         break;
       case ACT_AUTOADVERT:  _task->gotoAutoAdvertScreen();  break;
@@ -113,7 +113,7 @@ const ToolsScreen::Tool ToolsScreen::LOCATION_TOOLS[] = {
   { "Nearby Nodes", &ICON_MAP_CONTACT,  ACT_NEARBY },
   { "Live Share",   &ICON_ADVERT,       ACT_LIVESHARE },
   { "Trail",        &ICON_TRAIL,        ACT_TRAIL },
-  { "Geo Alert",    &ICON_MAP_WAYPOINT, ACT_GEOALERT },
+  { "Locator",    &ICON_MAP_WAYPOINT, ACT_LOCATOR },
   { "Compass",      &ICON_MAP_NORTH,    ACT_COMPASS },
 };
 const ToolsScreen::Tool ToolsScreen::COMMS_TOOLS[] = {

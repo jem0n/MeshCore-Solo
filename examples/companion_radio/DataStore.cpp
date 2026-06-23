@@ -376,29 +376,29 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   if (_prefs.loc_share_move_idx >= NodePrefs::LOC_SHARE_MOVE_COUNT)         _prefs.loc_share_move_idx = 1;
   if (_prefs.loc_share_interval_idx >= NodePrefs::LOC_SHARE_INTERVAL_COUNT) _prefs.loc_share_interval_idx = 1;
   if (_prefs.loc_share_heartbeat_idx >= NodePrefs::LOC_SHARE_HEARTBEAT_COUNT) _prefs.loc_share_heartbeat_idx = 0;
-  // → 0xC0DE0013: geo-alert + trail auto-pause. Pre-0x13 files leave stray bytes
+  // → 0xC0DE0013: locator + trail auto-pause. Pre-0x13 files leave stray bytes
   // here; clamp each back to its default so upgraders start with both off.
-  rd(&_prefs.geo_alert_enabled,    sizeof(_prefs.geo_alert_enabled));
-  rd(&_prefs.geo_alert_has_target, sizeof(_prefs.geo_alert_has_target));
-  rd(&_prefs.geo_alert_radius_idx, sizeof(_prefs.geo_alert_radius_idx));
-  rd(&_prefs.geo_alert_mode,       sizeof(_prefs.geo_alert_mode));
-  rd(&_prefs.geo_alert_lat_1e6,    sizeof(_prefs.geo_alert_lat_1e6));
-  rd(&_prefs.geo_alert_lon_1e6,    sizeof(_prefs.geo_alert_lon_1e6));
-  rd(_prefs.geo_alert_label,       sizeof(_prefs.geo_alert_label));
+  rd(&_prefs.locator_enabled,    sizeof(_prefs.locator_enabled));
+  rd(&_prefs.locator_has_target, sizeof(_prefs.locator_has_target));
+  rd(&_prefs.locator_radius_idx, sizeof(_prefs.locator_radius_idx));
+  rd(&_prefs.locator_mode,       sizeof(_prefs.locator_mode));
+  rd(&_prefs.locator_lat_1e6,    sizeof(_prefs.locator_lat_1e6));
+  rd(&_prefs.locator_lon_1e6,    sizeof(_prefs.locator_lon_1e6));
+  rd(_prefs.locator_label,       sizeof(_prefs.locator_label));
   rd(&_prefs.trail_autopause_idx,  sizeof(_prefs.trail_autopause_idx));
-  if (_prefs.geo_alert_enabled > 1)    _prefs.geo_alert_enabled = 0;
-  if (_prefs.geo_alert_has_target > 1) _prefs.geo_alert_has_target = 0;
-  if (_prefs.geo_alert_radius_idx >= NodePrefs::GEO_ALERT_RADIUS_COUNT) _prefs.geo_alert_radius_idx = 1;
-  if (_prefs.geo_alert_mode >= NodePrefs::GEO_ALERT_MODE_COUNT)         _prefs.geo_alert_mode = 0;
+  if (_prefs.locator_enabled > 1)    _prefs.locator_enabled = 0;
+  if (_prefs.locator_has_target > 1) _prefs.locator_has_target = 0;
+  if (_prefs.locator_radius_idx >= NodePrefs::LOCATOR_RADIUS_COUNT) _prefs.locator_radius_idx = 1;
+  if (_prefs.locator_mode >= NodePrefs::LOCATOR_MODE_COUNT)         _prefs.locator_mode = 0;
   if (_prefs.trail_autopause_idx >= NodePrefs::TRAIL_AUTOPAUSE_COUNT)   _prefs.trail_autopause_idx = 0;
-  _prefs.geo_alert_label[sizeof(_prefs.geo_alert_label) - 1] = '\0';
-  // → 0xC0DE0014: geo-alert proximity beeper.
-  rd(&_prefs.geo_alert_beeper, sizeof(_prefs.geo_alert_beeper));
-  if (_prefs.geo_alert_beeper > 1) _prefs.geo_alert_beeper = 0;
-  // → 0xC0DE0015: geo-alert can target a live contact (kind + pubkey prefix).
-  rd(&_prefs.geo_alert_target_kind, sizeof(_prefs.geo_alert_target_kind));
-  rd(_prefs.geo_alert_key,          sizeof(_prefs.geo_alert_key));
-  if (_prefs.geo_alert_target_kind > 1) _prefs.geo_alert_target_kind = 0;
+  _prefs.locator_label[sizeof(_prefs.locator_label) - 1] = '\0';
+  // → 0xC0DE0014: locator proximity beeper.
+  rd(&_prefs.locator_beeper, sizeof(_prefs.locator_beeper));
+  if (_prefs.locator_beeper > 1) _prefs.locator_beeper = 0;
+  // → 0xC0DE0015: locator can target a live contact (kind + pubkey prefix).
+  rd(&_prefs.locator_target_kind, sizeof(_prefs.locator_target_kind));
+  rd(_prefs.locator_key,          sizeof(_prefs.locator_key));
+  if (_prefs.locator_target_kind > 1) _prefs.locator_target_kind = 0;
   // Pre-0x10 files leave stray sentinel bytes here, same as a never-configured
   // device. Either way there's no valid saved profile, so default to a profile
   // in the same band as the companion's own network (_prefs.freq, already read
@@ -586,17 +586,17 @@ void DataStore::savePrefs(const NodePrefs& _prefs, double node_lat, double node_
     file.write((uint8_t *)&_prefs.loc_share_move_idx,    sizeof(_prefs.loc_share_move_idx));
     file.write((uint8_t *)&_prefs.loc_share_interval_idx, sizeof(_prefs.loc_share_interval_idx));
     file.write((uint8_t *)&_prefs.loc_share_heartbeat_idx, sizeof(_prefs.loc_share_heartbeat_idx));
-    file.write((uint8_t *)&_prefs.geo_alert_enabled,    sizeof(_prefs.geo_alert_enabled));
-    file.write((uint8_t *)&_prefs.geo_alert_has_target, sizeof(_prefs.geo_alert_has_target));
-    file.write((uint8_t *)&_prefs.geo_alert_radius_idx, sizeof(_prefs.geo_alert_radius_idx));
-    file.write((uint8_t *)&_prefs.geo_alert_mode,       sizeof(_prefs.geo_alert_mode));
-    file.write((uint8_t *)&_prefs.geo_alert_lat_1e6,    sizeof(_prefs.geo_alert_lat_1e6));
-    file.write((uint8_t *)&_prefs.geo_alert_lon_1e6,    sizeof(_prefs.geo_alert_lon_1e6));
-    file.write((uint8_t *)_prefs.geo_alert_label,       sizeof(_prefs.geo_alert_label));
+    file.write((uint8_t *)&_prefs.locator_enabled,    sizeof(_prefs.locator_enabled));
+    file.write((uint8_t *)&_prefs.locator_has_target, sizeof(_prefs.locator_has_target));
+    file.write((uint8_t *)&_prefs.locator_radius_idx, sizeof(_prefs.locator_radius_idx));
+    file.write((uint8_t *)&_prefs.locator_mode,       sizeof(_prefs.locator_mode));
+    file.write((uint8_t *)&_prefs.locator_lat_1e6,    sizeof(_prefs.locator_lat_1e6));
+    file.write((uint8_t *)&_prefs.locator_lon_1e6,    sizeof(_prefs.locator_lon_1e6));
+    file.write((uint8_t *)_prefs.locator_label,       sizeof(_prefs.locator_label));
     file.write((uint8_t *)&_prefs.trail_autopause_idx,  sizeof(_prefs.trail_autopause_idx));
-    file.write((uint8_t *)&_prefs.geo_alert_beeper,     sizeof(_prefs.geo_alert_beeper));
-    file.write((uint8_t *)&_prefs.geo_alert_target_kind, sizeof(_prefs.geo_alert_target_kind));
-    file.write((uint8_t *)_prefs.geo_alert_key,         sizeof(_prefs.geo_alert_key));
+    file.write((uint8_t *)&_prefs.locator_beeper,     sizeof(_prefs.locator_beeper));
+    file.write((uint8_t *)&_prefs.locator_target_kind, sizeof(_prefs.locator_target_kind));
+    file.write((uint8_t *)_prefs.locator_key,         sizeof(_prefs.locator_key));
 
     // Tail sentinel — must be last. See NodePrefs::SCHEMA_SENTINEL.
     uint32_t sentinel = NodePrefs::SCHEMA_SENTINEL;
