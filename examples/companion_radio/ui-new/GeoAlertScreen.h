@@ -211,6 +211,7 @@ public:
   }
 
   void openPicker() {
+    if (!_prefs) return;
     buildTargets();
     if (_target_n == 0) { _task->showAlert("No favs / waypoints", 1400); return; }
     int cur = currentTargetIndex();

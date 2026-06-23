@@ -372,6 +372,7 @@ void DataStore::loadPrefsInt(const char *filename, NodePrefs& _prefs, double& no
   rd(&_prefs.loc_share_heartbeat_idx, sizeof(_prefs.loc_share_heartbeat_idx));
   if (_prefs.loc_share_enabled > 1)     _prefs.loc_share_enabled = 0;
   if (_prefs.loc_share_target_type > 1) _prefs.loc_share_target_type = 0;
+  if (_prefs.loc_share_channel_idx >= MAX_GROUP_CHANNELS) _prefs.loc_share_channel_idx = 0;
   if (_prefs.loc_share_move_idx >= NodePrefs::LOC_SHARE_MOVE_COUNT)         _prefs.loc_share_move_idx = 1;
   if (_prefs.loc_share_interval_idx >= NodePrefs::LOC_SHARE_INTERVAL_COUNT) _prefs.loc_share_interval_idx = 1;
   if (_prefs.loc_share_heartbeat_idx >= NodePrefs::LOC_SHARE_HEARTBEAT_COUNT) _prefs.loc_share_heartbeat_idx = 0;
