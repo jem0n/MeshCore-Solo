@@ -606,55 +606,53 @@ public:
     }
     if (have_gps) { int px, py; project(mla, mlo, px, py); miniIconDrawCentered(display, px, py, ICON_MAP_CURRENT); }
 
-    // Bottom-left info: distance to the nearest live-tracked point, when we
-    // have both a fix and at least one active share — a single concrete
-    // number beats an abstract scale, and as plain text it's far less likely
-    // to land under a plotted dot than the old full-width bar+ticks were.
-    // Falls back to a compact one-line scale tick when there's nothing to
-    // measure against (no fix, or a trail with no live contacts).
+    // Bottom-left scale reference, always shown — distance to the nearest
+    // live-tracked contact now lives on the status line below instead (see
+    // nearestTrackedKm() / render()), so this corner is free for it.
     {
-      float nearest_km = -1.0f;
-      if (have_gps) {
-        for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
-          if (!lt.isActive(i, now)) continue;
-          float d = geo::haversineKm(mla, mlo, lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6);
-          if (nearest_km < 0.0f || d < nearest_km) nearest_km = d;
-        }
-      }
       display.setColor(DisplayDriver::LIGHT);
       int ty = ay + ah - display.getLineHeight();
-      if (nearest_km >= 0.0f) {
-        char dist[12], buf[16];
-        geo::fmtDist(dist, sizeof(dist), nearest_km, _task->useImperial());
-        snprintf(buf, sizeof(buf), "->%s", dist);
-        display.setCursor(ax + 1, ty);
-        display.print(buf);
-      } else {
-        static const float M_PER_1E6 = 0.11132f;            // metres per 1e-6° lat
-        float ppm = scale / M_PER_1E6;                       // pixels per metre
-        if (ppm > 0.0f) {
-          bool imp = _task->useImperial();
-          static const float MET_M[] = { 5,10,25,50,100,250,500,1000,2000,5000,10000,25000,50000 };
-          static const char* MET_L[] = { "5m","10m","25m","50m","100m","250m","500m","1km","2km","5km","10km","25km","50km" };
-          static const float IMP_M[] = { 4.572f,15.24f,30.48f,76.2f,152.4f,402.34f,804.67f,1609.34f,4828.0f,16093.4f,80467.2f };
-          static const char* IMP_L[] = { "15ft","50ft","100ft","250ft","500ft","1/4mi","1/2mi","1mi","3mi","10mi","50mi" };
-          const float* M = imp ? IMP_M : MET_M;
-          const char* const* L = imp ? IMP_L : MET_L;
-          int N = imp ? (int)(sizeof(IMP_M) / sizeof(IMP_M[0])) : (int)(sizeof(MET_M) / sizeof(MET_M[0]));
-          float target = 8.0f / ppm;                         // short reference tick, not 1/3 of the width
-          int sel = 0;
-          for (int i = N - 1; i >= 0; i--) if (M[i] <= target) { sel = i; break; }
-          int barpx = (int)(M[sel] * ppm + 0.5f);
-          if (barpx < 5)        barpx = 5;
-          if (barpx > aw / 4)   barpx = aw / 4;
-          int bx = ax + 1, mid = ty + display.getLineHeight() / 2;
-          display.fillRect(bx, mid, barpx, 1);                // single tick, on the text baseline
-          display.setCursor(bx + barpx + 2, ty);
-          display.print(L[sel]);
-        }
+      static const float M_PER_1E6 = 0.11132f;            // metres per 1e-6° lat
+      float ppm = scale / M_PER_1E6;                       // pixels per metre
+      if (ppm > 0.0f) {
+        bool imp = _task->useImperial();
+        static const float MET_M[] = { 5,10,25,50,100,250,500,1000,2000,5000,10000,25000,50000 };
+        static const char* MET_L[] = { "5m","10m","25m","50m","100m","250m","500m","1km","2km","5km","10km","25km","50km" };
+        static const float IMP_M[] = { 4.572f,15.24f,30.48f,76.2f,152.4f,402.34f,804.67f,1609.34f,4828.0f,16093.4f,80467.2f };
+        static const char* IMP_L[] = { "15ft","50ft","100ft","250ft","500ft","1/4mi","1/2mi","1mi","3mi","10mi","50mi" };
+        const float* M = imp ? IMP_M : MET_M;
+        const char* const* L = imp ? IMP_L : MET_L;
+        int N = imp ? (int)(sizeof(IMP_M) / sizeof(IMP_M[0])) : (int)(sizeof(MET_M) / sizeof(MET_M[0]));
+        float target = 8.0f / ppm;                         // short reference tick, not 1/3 of the width
+        int sel = 0;
+        for (int i = N - 1; i >= 0; i--) if (M[i] <= target) { sel = i; break; }
+        int barpx = (int)(M[sel] * ppm + 0.5f);
+        if (barpx < 5)        barpx = 5;
+        if (barpx > aw / 4)   barpx = aw / 4;
+        int bx = ax + 1, mid = ty + display.getLineHeight() / 2;
+        display.fillRect(bx, mid, barpx, 1);                // single tick, on the text baseline
+        display.setCursor(bx + barpx + 2, ty);
+        display.print(L[sel]);
       }
     }
     return true;
+  }
+
+  // Distance to the nearest live-tracked ([LOC]-sharing) contact, in km, or
+  // -1 when we don't have a fix or there's no active share to measure
+  // against. Shared by the MAP status line (see render()).
+  float nearestTrackedKm() {
+    int32_t mla, mlo;
+    if (!_task->currentLocation(mla, mlo)) return -1.0f;
+    LiveTrackStore& lt = _task->liveTrack();
+    uint32_t now = rtc_clock.getCurrentTime();
+    float nearest_km = -1.0f;
+    for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
+      if (!lt.isActive(i, now)) continue;
+      float d = geo::haversineKm(mla, mlo, lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6);
+      if (nearest_km < 0.0f || d < nearest_km) nearest_km = d;
+    }
+    return nearest_km;
   }
 
   // Small 5x5 glyph shown in the page-indicator row for each HomePage.
@@ -1065,17 +1063,36 @@ public:
       int info_y = display.height() - step;
       int area_h = info_y - content_y - 2;
       bool drew = drawMapPreview(display, 2, content_y, display.width() - 4, area_h);
-      char info[40];
+      char left[20], right[16] = {0};
       uint32_t now_m = rtc_clock.getCurrentTime();
       LiveTrackStore& lt = _task->liveTrack();
       int trk = lt.active(now_m);
-      // Fix state now lives in the top-bar GPS icon and distance-to-nearest
-      // inside the preview itself, so this line just covers track count.
-      snprintf(info, sizeof(info), "Track:%d", trk);
+      // Fix state lives in the top-bar GPS icon. Track count plus an arrow +
+      // distance to the nearest live-tracked contact (when we have both a fix
+      // and an active share) share this one status line.
+      snprintf(left, sizeof(left), "Track:%d", trk);
+      float nearest_km = nearestTrackedKm();
+      if (nearest_km >= 0.0f) geo::fmtDist(right, sizeof(right), nearest_km, _task->useImperial());
       display.setColor(DisplayDriver::LIGHT);
       if (!drew)
         display.drawTextCentered(display.width() / 2, content_y + area_h / 2, "No GPS / no trail");
-      display.drawTextCentered(display.width() / 2, info_y, info);
+      if (right[0]) {
+        // Manual layout (not drawTextCentered) so the arrow mini-icon sits
+        // inline between the two text runs.
+        const int s = miniIconScale(display);
+        const int gap = 3;
+        int lw = display.getTextWidth(left);
+        int iw = ICON_MAP_ARROW.w * s;
+        int rw = display.getTextWidth(right);
+        int x = display.width() / 2 - (lw + gap + iw + gap + rw) / 2;
+        display.setCursor(x, info_y);
+        display.print(left);
+        miniIconDrawTop(display, x + lw + gap, info_y + (lh - ICON_MAP_ARROW.h * s) / 2, ICON_MAP_ARROW);
+        display.setCursor(x + lw + gap + iw + gap, info_y);
+        display.print(right);
+      } else {
+        display.drawTextCentered(display.width() / 2, info_y, left);
+      }
     } else if (_page == HomePage::TOOLS) {
       display.setColor(DisplayDriver::LIGHT);
       display.setTextSize(1);

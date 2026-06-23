@@ -328,6 +328,12 @@ MINI_ICON(ICON_MAP_NORTH, 5,      // "N" with a peaked roof — compass north ma
   packRow("#.#.#"),
   packRow("#..##"),
   packRow("#...#"));
+MINI_ICON(ICON_MAP_ARROW, 5,      // → distance-to-nearest-tracked-contact indicator
+  packRow("..#.."),
+  packRow("...#."),
+  packRow("#####"),
+  packRow("...#."),
+  packRow("..#.."));
 
 // Keyboard special-key glyphs.
 MINI_ICON(ICON_SHIFT, 7,   // ⇧  caps
