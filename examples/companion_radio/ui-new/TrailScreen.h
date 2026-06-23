@@ -11,7 +11,40 @@
 #include "icons.h"     // scalable mini-icons (map markers, north arrow, grid dots)
 #include "NavView.h"
 #include "WaypointsView.h"
+#include <helpers/StreamUtils.h>
 #include <math.h>
+
+// Bounds every Serial write the GPX export makes. A full trail dump is tens
+// of KB across hundreds of individual write() calls (one or more per point) —
+// without this, a serial monitor that's open but not actively reading (DTR
+// asserted, nothing draining the USB-CDC FIFO) would block each one, and the
+// main loop with it, indefinitely (see StreamUtils.h). Duck-typed to the
+// handful of Print methods Trail.h's GPX writers actually call, so it slots
+// into their `S& out` template parameter without any change there.
+// __FlashStringHelper content is plain flash on nRF52/ARM (no
+// Harvard-architecture PROGMEM split), so it's safe to read like any other
+// char*.
+//
+// The first stalled write gives up for the rest of the export (_gave_up),
+// rather than re-arming a fresh timeout on every one of those hundreds of
+// calls — a host that's truly stuck would otherwise cost calls × timeout_ms
+// in total instead of one bounded stall.
+struct BoundedSerialPrint {
+  uint32_t timeout_ms;
+  bool _gave_up;
+  BoundedSerialPrint(uint32_t t) : timeout_ms(t), _gave_up(false) {}
+  size_t write(const uint8_t* buf, size_t len) {
+    if (_gave_up) return 0;
+    size_t sent = streamWriteUntil(Serial, buf, len, millis() + timeout_ms);
+    if (sent < len) _gave_up = true;
+    return sent;
+  }
+  size_t print(const char* s) { return write((const uint8_t*)s, strlen(s)); }
+  size_t print(const __FlashStringHelper* s) {
+    const char* p = reinterpret_cast<const char*>(s);
+    return write((const uint8_t*)p, strlen(p));
+  }
+};
 
 class TrailScreen : public UIScreen {
   UITask*     _task;
@@ -219,7 +252,8 @@ private:
   }
   void handleExport() {
     if (!Serial) { _task->showAlert("Connect USB first", 1200); return; }
-    size_t n = _store->exportGpx(Serial, _task->waypoints());
+    BoundedSerialPrint out{300};
+    size_t n = _store->exportGpx(out, _task->waypoints());
     showExportAlert(n);
   }
 
@@ -229,7 +263,8 @@ private:
     if (!ds) { _task->showAlert("FS unavailable", 800); return; }
     File f = ds->openRead(TRAIL_FILE);
     if (!f) { _task->showAlert("No saved trail", 800); return; }
-    size_t n = TrailStore::exportGpxFromFile(f, Serial, _task->waypoints());
+    BoundedSerialPrint out{300};
+    size_t n = TrailStore::exportGpxFromFile(f, out, _task->waypoints());
     f.close();
     if (n == 0) { _task->showAlert("Bad saved file", 1000); return; }
     showExportAlert(n);
