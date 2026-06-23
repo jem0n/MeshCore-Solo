@@ -8,7 +8,7 @@
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
 
-The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, geo-alert, compass, device diagnostics, and repeater mode. Navigate the tool list with **UP/DOWN** and press **Enter** to open a tool.
+The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, geo-alert, compass, device diagnostics, and repeater mode. Tools are grouped into collapsible **Location** / **Comms** / **System** sections — the same fold-in-place model as Settings; Tools always opens folded back to the section list. Navigate with **UP/DOWN**, press **Enter** on a section header to expand or collapse it, or on a tool to open it.
 
 ---
 
@@ -81,7 +81,9 @@ Because it is the same list, all the same keys apply — **UP/DOWN** to navigate
 Records your route in a RAM ring buffer (up to 512 points, sampled every 1 s). Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
 
 > [!TIP]
-> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts) with a **north marker** and a **scale bar**, and a status line with the GPS-fix state, tracked-node count and distance to the **nearest** tracked contact. Press **Enter** to open the full Trail Map; **Hold Enter** shares your position (see **Live Share**); **Back** returns home.
+> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts) with a **north marker**, plus a status line with tracked-node count. The bottom-left corner shows a `->dist` label to the **nearest** tracked contact when one is in range, falling back to a small scale tick otherwise. Press **Enter** to open the full Trail Map; **Hold Enter** shares your position (see **Live Share**); **Back** returns home.
+
+A GPS fix indicator also sits in the top status bar, alongside the trail/auto-advert/repeater icons — boxed (lit) once the receiver has a valid fix, a plain glyph while still searching. It only appears on boards with GPS hardware and while **GPS** is turned on in Settings; it's hidden the rest of the time rather than sitting there empty.
 
 Cycle views with **LEFT / RIGHT**:
 
@@ -208,7 +210,7 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 | Setting    | Options                     | Notes                                                                                          |
 | ---------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
-| Track loc  | ON / OFF                    | Receive incoming `[LOC]` shares (DM and monitored channels) and pin those senders on the map / in Nearby. Off by default. |
+| Track loc  | ON / OFF                    | Receive incoming `[LOC]` shares (DM, monitored channels, and room-server posts) and pin those senders on the map / in Nearby. Off by default. |
 | Auto share | ON / OFF                    | Periodically broadcast **your own** position to the target below while you move.                |
 | To         | channel or contact          | **Enter** opens the Messages recipient chooser to pick the target channel or DM contact.        |
 | Move       | 50 / 100 / 250 / 500 m      | Movement gate — only send after you've moved at least this far since the last share.            |
@@ -217,7 +219,7 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 **How auto-share decides to send.** With **Auto share** on, the device checks a few times a minute: it transmits when you've moved at least **Move** metres *and* at least **Min gap** has passed since the last send — so a stationary device stays silent unless a **Heartbeat** is set. It also sends once immediately when you enable sharing (or change the target), so the other end gets a fresh fix right away.
 
-**Receiving.** With **Track loc** on, incoming `[LOC]` messages update a small live table (up to 16 nodes, entries expire ~20 min after the last update). DM shares are keyed by the sender's public key (reliable); channel shares are keyed by name (best-effort, since channel names are unsigned). Tracked nodes appear on the **Trail Map** as a filled diamond with the first two characters of their name, and in **Nearby Nodes** with their live distance/bearing.
+**Receiving.** With **Track loc** on, incoming `[LOC]` messages update a small live table (up to 16 nodes, entries expire ~20 min after the last update). DM shares are keyed by the sender's public key (reliable); channel and room-server shares are keyed by name (best-effort, since channel names are unsigned and a room post only carries a short sender prefix). Tracked nodes appear on the **Trail Map** as a filled diamond with the first two characters of their name, and in **Nearby Nodes** with their live distance/bearing.
 
 **One-shot share.** To send your position once without enabling auto-share, use **Tools › Trail → Hold Enter → Share my pos** — it builds a `[LOC]` message and hands it to the Messages screen to pick a recipient. There's also a shortcut from the home **Map** page: **Hold Enter** sends an immediate position update to your Live Share target while auto-sharing is on (toast `Position shared`), or opens the recipient picker if it isn't — so you never broadcast to a default channel by accident.
 
