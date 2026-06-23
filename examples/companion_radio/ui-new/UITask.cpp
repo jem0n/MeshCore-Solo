@@ -493,10 +493,11 @@ class HomeScreen : public UIScreen {
     }
 
     // GPS fix status — boxed (lit) when the receiver has a valid fix, plain
-    // glyph while searching. Hidden entirely on boards with no GPS hardware,
-    // so profiles without one don't carry a permanently-empty slot.
+    // glyph while searching. Hidden entirely on boards with no GPS hardware
+    // and while the GPS setting itself is off, so it doesn't sit there as a
+    // permanently-empty slot or imply a search that isn't happening.
     LocationProvider* loc = _sensors ? _sensors->getLocationProvider() : nullptr;
-    if (loc) {
+    if (loc && _node_prefs && _node_prefs->gps_enabled) {
       int gX = leftmostX - ind - ind_gap;
       if (loc->isValid()) drawBoxedIcon(display, gX, ind, ind_h, ICON_GPS);
       else                drawSlotIcon(display, gX, ind, ind_h, ICON_GPS);
