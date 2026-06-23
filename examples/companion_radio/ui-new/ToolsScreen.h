@@ -79,7 +79,7 @@ public:
         display.setCursor(2, y);
         display.print(collapsed ? "+" : "-");
         const int icon_x = 2 + cw + 2;
-        drawIcon(display, icon_x, y, SECTIONS[sec].icon);
+        // drawIcon(display, icon_x, y, SECTIONS[sec].icon); // icons disabled for now, don't fit visually
         display.setCursor(icon_x + g, y);
         display.print(SECTIONS[sec].name);
       },
@@ -87,7 +87,7 @@ public:
       [&](int sec, int item, int y, bool sel, int reserve) {
         display.drawSelectionRow(0, y - 1, display.width() - reserve, display.lineStep() - 1, sel);
         const int icon_x = 2 + cw + 2;   // align item icons under the header icon
-        drawIcon(display, icon_x, y, SECTIONS[sec].tools[item].icon);
+        // drawIcon(display, icon_x, y, SECTIONS[sec].tools[item].icon); // icons disabled for now, don't fit visually
         display.setCursor(icon_x + g, y);
         display.print(SECTIONS[sec].tools[item].label);
       });

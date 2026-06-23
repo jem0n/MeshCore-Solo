@@ -165,6 +165,13 @@ MINI_ICON(ICON_REPEATER, 6,   // » double chevron — relaying/forwarding (repe
   packRow(".#..#."),
   packRow("#..#.."));
 
+MINI_ICON(ICON_GPS, 5,   // reticle — GPS fix status (boxed = fix, plain = searching)
+  packRow(".###."),
+  packRow("#...#"),
+  packRow("#.#.#"),
+  packRow("#...#"),
+  packRow(".###."));
+
 // Tools-menu glyphs (auto-reply bot, ringtone editor, diagnostics, system).
 MINI_ICON(ICON_BOT, 5,   // robot head: antenna + eyes + grille (auto-reply bot)
   packRow("..#.."),
@@ -238,8 +245,8 @@ MINI_ICON(ICON_PG_ADVERT, 5,     // mast + radiating waves — advert
   packRow("..#.."));
 MINI_ICON(ICON_PG_GPS, 5,        // location pin — GPS
   packRow(".###."),
-  packRow("#...#"),
-  packRow("#...#"),
+  packRow("#.#.#"),
+  packRow("#.#.#"),
   packRow(".#.#."),
   packRow("..#.."));
 MINI_ICON(ICON_PG_SENSORS, 5,    // thermometer/gauge — sensors
