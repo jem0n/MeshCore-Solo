@@ -1616,6 +1616,11 @@ void UITask::notify(UIEventType t) {
     sn.playCH(_last_notif_ch_idx);
     _last_notif_ch_idx = -1;
     break;
+  case UIEventType::roomMessage:
+    // Rooms have many authors and no per-room melody pref, so use the default DM
+    // notification (no per-sender melody/mute lookup — the author varies per post).
+    sn.playDM(false, nullptr);
+    break;
   case UIEventType::advertReceivedFlood:
   case UIEventType::advertReceivedZeroHop:
     sn.playAD(t == UIEventType::advertReceivedFlood);
@@ -1623,7 +1628,6 @@ void UITask::notify(UIEventType t) {
   case UIEventType::ack:
     buzzer.play("ack:d=32,o=8,b=120:c");
     break;
-  case UIEventType::roomMessage:
   case UIEventType::none:
   default:
     break;
