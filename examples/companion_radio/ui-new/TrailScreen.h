@@ -601,6 +601,8 @@ private:
       for (int i = 0; i < LiveTrackStore::CAPACITY; i++)
         if (lt.isActive(i, now)) fold(lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6);
     }
+    // Fold in the active target too, so a destination you set never sits off-frame.
+    { int32_t tla, tlo; if (_task->activeTargetPos(tla, tlo)) fold(tla, tlo); }
     return init;
   }
 
@@ -648,6 +650,16 @@ private:
       int ex, ey; proj.project(_store->last().lat_1e6, _store->last().lon_1e6, ex, ey);
       drawCurrentMarker(display, ex, ey);
     }
+
+    // Active target flag, last so it stays legible atop any waypoint/contact it
+    // coincides with. Clamped to the frame like the other off-edge markers.
+    int32_t tla, tlo;
+    if (_task->activeTargetPos(tla, tlo)) {
+      int tx, ty; proj.project(tla, tlo, tx, ty);
+      if (tx < area_x) tx = area_x;  else if (tx > wp_x_max) tx = wp_x_max;
+      if (ty < area_y) ty = area_y;  else if (ty > wp_y_max) ty = wp_y_max;
+      drawTargetMarker(display, tx, ty);
+    }
   }
 
   void renderMap(DisplayDriver& display) {
@@ -663,8 +675,10 @@ private:
     int32_t my_lat, my_lon;
     const bool have_gps = ownPos(my_lat, my_lon);
     const bool have_live = _task->liveTrack().active(rtc_clock.getCurrentTime()) > 0;
+    int32_t tgt_lat, tgt_lon;
+    const bool have_tgt = _task->activeTargetPos(tgt_lat, tgt_lon);
 
-    if (!have_trail && nwp == 0 && !have_gps && !have_live) {
+    if (!have_trail && nwp == 0 && !have_gps && !have_live && !have_tgt) {
       display.drawTextCentered(display.width() / 2, (top + bottom) / 2, "No GPS / no trail");
       return;
     }
@@ -694,6 +708,7 @@ private:
         drawWaypointLabel(display, s, ccx, ccy, area_x, area_y, area_w, area_h);
       }
       if (have_gps || have_trail) drawCurrentMarker(display, ccx, ccy);
+      { int32_t tla, tlo; if (_task->activeTargetPos(tla, tlo)) drawTargetMarker(display, ccx, ccy); }
       return;
     }
 
@@ -938,5 +953,10 @@ private:
   // Filled diamond — a contact whose position arrived via a [LOC] share.
   static void drawContactMarker(DisplayDriver& d, int cx, int cy) {
     miniIconDrawCentered(d, cx, cy, ICON_MAP_CONTACT);
+  }
+  // Flag — the active Locator/Nav target. Drawn last (on top) so it stays
+  // legible even when it lands on the same spot as a waypoint or contact.
+  static void drawTargetMarker(DisplayDriver& d, int cx, int cy) {
+    miniIconDrawCentered(d, cx, cy, ICON_MAP_TARGET);
   }
 };

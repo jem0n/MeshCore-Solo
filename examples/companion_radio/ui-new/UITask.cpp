@@ -574,6 +574,9 @@ public:
     int32_t mla, mlo;
     bool have_gps = _task->currentLocation(mla, mlo);
     if (have_gps) fold(mla, mlo);
+    int32_t tla, tlo;
+    bool have_tgt = _task->activeTargetPos(tla, tlo);   // active Locator/Nav target
+    if (have_tgt) fold(tla, tlo);
     if (!init) return false;
 
     // North marker — top-right, the same mini-icon as the full Trail map.
@@ -589,6 +592,7 @@ public:
       for (int i = 0; i < LiveTrackStore::CAPACITY; i++)
         if (lt.isActive(i, now)) { miniIconDrawCentered(display, cx, cy, ICON_MAP_CONTACT); break; }
       if (have_gps || !tr.empty()) miniIconDrawCentered(display, cx, cy, ICON_MAP_CURRENT);
+      if (have_tgt) miniIconDrawCentered(display, cx, cy, ICON_MAP_TARGET);   // highlight on top
       return true;
     }
     float avg_lat_rad = ((mnla + mxla) / 2.0e6f) * (float)M_PI / 180.0f;
@@ -615,6 +619,8 @@ public:
       miniIconDrawCentered(display, px, py, ICON_MAP_CONTACT);
     }
     if (have_gps) { int px, py; project(mla, mlo, px, py); miniIconDrawCentered(display, px, py, ICON_MAP_CURRENT); }
+    // Active target flag drawn last so it stays legible even atop a contact/own dot.
+    if (have_tgt) { int px, py; project(tla, tlo, px, py); miniIconDrawCentered(display, px, py, ICON_MAP_TARGET); }
 
     // Bottom-left scale reference, always shown — distance to the nearest
     // live-tracked contact now lives on the status line below instead (see
@@ -2298,14 +2304,18 @@ bool UITask::resolvePersonPos(const uint8_t* key, int32_t& lat, int32_t& lon,
   return false;
 }
 
-bool UITask::locatorDistance(float& dist_m, float& radius_m) const {
+bool UITask::activeTargetPos(int32_t& lat, int32_t& lon) const {
   if (!_node_prefs || !_node_prefs->locator_has_target) return false;
+  if (_node_prefs->locator_target_kind == 1)
+    return resolvePersonPos(_node_prefs->locator_key, lat, lon);
+  lat = _node_prefs->locator_lat_1e6;
+  lon = _node_prefs->locator_lon_1e6;
+  return true;
+}
+
+bool UITask::locatorDistance(float& dist_m, float& radius_m) const {
   int32_t tlat, tlon;
-  if (_node_prefs->locator_target_kind == 1) {
-    if (!resolvePersonPos(_node_prefs->locator_key, tlat, tlon)) return false;
-  } else {
-    tlat = _node_prefs->locator_lat_1e6; tlon = _node_prefs->locator_lon_1e6;
-  }
+  if (!activeTargetPos(tlat, tlon)) return false;
   int32_t lat, lon;
   if (!currentLocation(lat, lon)) return false;
   dist_m   = geo::haversineKm(lat, lon, tlat, tlon) * 1000.0f;

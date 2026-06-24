@@ -211,6 +211,11 @@ public:
   // Locator engine (locatorDistance) and the target picker.
   bool resolvePersonPos(const uint8_t* key, int32_t& lat, int32_t& lon,
                         bool* live = nullptr, uint32_t* ts = nullptr) const;
+  // Resolved position of the active target — a waypoint's coords, or a person
+  // via resolvePersonPos(). Gated only on a target being set, independent of
+  // whether the Locator alert is enabled, so a destination you set still shows
+  // on the map. Used by locatorDistance() and the map renderers.
+  bool activeTargetPos(int32_t& lat, int32_t& lon) const;
   void gotoTrailScreen();
   void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();

@@ -334,6 +334,12 @@ MINI_ICON(ICON_MAP_ARROW, 5,      // → distance-to-nearest-tracked-contact ind
   packRow("#####"),
   packRow("...#."),
   packRow("..#.."));
+MINI_ICON(ICON_MAP_TARGET, 5,     // ⚑ flag on a pole — the active Locator/Nav target
+  packRow("#...."),
+  packRow("####."),
+  packRow("#..#."),
+  packRow("####."),
+  packRow("#...."));
 
 // Keyboard special-key glyphs.
 MINI_ICON(ICON_SHIFT, 7,   // ⇧  caps
