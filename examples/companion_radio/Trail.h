@@ -137,16 +137,24 @@ public:
   // the first point after a stop/start cycle get flagged TRAIL_FLAG_SEG_START
   // so the map renderer breaks the line.
   //
-  // Straight-run simplification: a sample is only ever a *candidate* vertex
-  // (_pending) until the next sample proves it was a real bend. On each new
-  // sample, check whether the previous candidate still lies within
-  // min_delta_m of the straight line from the last committed vertex to this
-  // new sample — if so it was redundant (the run is still straight), drop it
-  // and extend the candidate; if not, the candidate was a genuine corner, so
-  // commit it as a vertex and start a fresh candidate run from there. This
-  // reuses min_delta_m as the simplification tolerance too, so a straight
-  // road costs two stored points (its endpoints) no matter how long it is,
-  // while a curve still gets a vertex every ~min_delta_m of deviation.
+  // Straight-run simplification (a fixed-corridor / Reumann–Witkam pass): a
+  // sample is only ever a *candidate* vertex (_pending) until a later one
+  // proves the run has bent. The corridor is the straight line anchored at the
+  // last committed vertex and aimed at the first sample of this run (_dir);
+  // each new sample is tested against *that fixed line*. While it stays within
+  // min_delta_m of the corridor the run is still "straight enough", so drop
+  // the intermediate and extend; once a sample leaves the corridor the
+  // previous in-corridor sample (_pending) was the last good vertex, so commit
+  // it and open a fresh corridor from there.
+  //
+  // The fixed direction is the whole point: testing the newest sample against
+  // a line that re-aims at the newest sample (or testing the previous
+  // candidate, which always sits right beside that moving endpoint where the
+  // cross-track is near zero) lets a long gentle curve slip through one
+  // sub-min_delta step at a time and collapse to a single chord that deviates
+  // arbitrarily far. Anchoring the direction bounds the stored polyline to
+  // ~min_delta_m of the real track, while a straight road still costs just its
+  // two endpoints no matter how long it is.
   bool addPoint(int32_t lat_1e6, int32_t lon_1e6, uint32_t ts, uint16_t min_delta_m) {
     const TrailPoint* ref = _has_pending ? &_pending : (_count > 0 ? &last() : nullptr);
     if (ref && !_pending_seg_break) {
@@ -163,22 +171,27 @@ public:
 
     TrailPoint sample{ lat_1e6, lon_1e6, ts, 0 };
     if (!_has_pending) {
-      _pending = sample;
+      _pending     = sample;   // last in-corridor sample (the commit candidate)
+      _dir         = sample;   // fixes the corridor direction: last() → _dir
       _has_pending = true;
       return true;
     }
 
-    if (crossTrackMeters(last(), sample, _pending) <= (float)min_delta_m) {
-      _pending = sample;                                            // still straight — extend
+    if (crossTrackMeters(last(), _dir, sample) <= (float)min_delta_m) {
+      _pending = sample;                                            // within corridor — extend
     } else {
-      commitPoint(_pending.lat_1e6, _pending.lon_1e6, _pending.ts, 0);  // real bend — keep it
-      _pending = sample;
+      commitPoint(_pending.lat_1e6, _pending.lon_1e6, _pending.ts, 0);  // left corridor — keep last good
+      _pending = sample;   // the exiting sample opens the next run...
+      _dir     = sample;   // ...and fixes its corridor direction from the just-committed vertex
     }
     return true;
   }
 
   // Sum of pairwise Haversine deltas across the whole ring, skipping segment
-  // boundaries (a SEG_START point isn't reached from its predecessor).
+  // boundaries (a SEG_START point isn't reached from its predecessor). The
+  // uncommitted candidate (_pending) is counted too, so the live total doesn't
+  // stall over a long straight run — where simplification holds the whole
+  // stretch as one pending point until a bend forces a commit (see addPoint()).
   uint32_t totalDistanceMeters() const {
     float d = 0;
     for (int i = 1; i < _count; i++) {
@@ -186,6 +199,9 @@ public:
       d += haversineMeters(at(i - 1).lat_1e6, at(i - 1).lon_1e6,
                             at(i).lat_1e6,     at(i).lon_1e6);
     }
+    if (_has_pending && _count > 0)
+      d += haversineMeters(last().lat_1e6, last().lon_1e6,
+                            _pending.lat_1e6, _pending.lon_1e6);
     return (uint32_t)d;
   }
 
@@ -427,9 +443,12 @@ private:
   uint32_t _session_start_ms = 0;       // millis() of the current active session, 0 if none
 
   // Streaming simplification: a sample that passed the min-delta gate but
-  // hasn't been committed as a real vertex yet — see addPoint().
+  // hasn't been committed as a real vertex yet — see addPoint(). _dir is the
+  // first sample of the current run; last()→_dir fixes the corridor direction
+  // every later sample of the run is tested against.
   bool       _has_pending = false;
   TrailPoint _pending;
+  TrailPoint _dir;
 
   void commitPoint(int32_t lat_1e6, int32_t lon_1e6, uint32_t ts, uint8_t flags) {
     int pos;
