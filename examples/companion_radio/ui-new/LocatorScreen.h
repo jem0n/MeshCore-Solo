@@ -6,8 +6,9 @@
 // of (leave/away) the radius. A waypoint target is snapshotted (coord + label);
 // a person target follows their latest shared position. The crossing engine
 // lives in UITask::evaluateLocator(). The Target row's Enter opens a picker
-// (favourites first — offered even with no known position yet, so you can arm
-// ahead of time — then any other contact with a currently-known position:
+// ("None" first — the only way to unset a target once chosen — then
+// favourites, offered even with no known position yet so you can arm ahead
+// of time, then any other contact with a currently-known position:
 // live-sharing or just last-advertised, e.g. a repeater; then waypoints).
 // LEFT/RIGHT quick-cycles the same set. The same active target can also be set
 // directly from Nearby Nodes' or Waypoints' own "Set as target" menu item
@@ -34,7 +35,7 @@ class LocatorScreen : public UIScreen {
   bool       _picking = false;
   int        _pick_sel = 0, _pick_scroll = 0;
   struct Target {
-    uint8_t  kind;            // 0=waypoint 1=person
+    uint8_t  kind;            // 0=waypoint 1=person 2=none (clear target)
     int32_t  lat, lon;
     uint8_t  key[6];
     char     name[20];
@@ -170,7 +171,8 @@ public:
     return true;
   }
 
-  // Build the selectable target set into _targets: favourites first (the quick
+  // Build the selectable target set into _targets: "None" first (clears the
+  // target — the only way to unset it once chosen), then favourites (the quick
   // path you pin ahead of time, offered even with no known position yet), then
   // any other contact with a currently-known position — live-sharing or just
   // last-advertised (a repeater, a room, or someone who shared a fix once) —
@@ -178,6 +180,10 @@ public:
   // re-resolves their position each evaluation rather than trusting a snapshot.
   void buildTargets() {
     _target_n = 0;
+    Target& none = _targets[_target_n++];
+    none.kind = 2; none.lat = 0; none.lon = 0; none.ts = 0; none.live = false;
+    memset(none.key, 0, 6);
+    snprintf(none.name, sizeof(none.name), "(none)");
     for (int i = 0; i < NodePrefs::FAVOURITES_COUNT; i++) {
       const uint8_t* pre = _prefs->favourite_contacts[i];
       bool empty = true;
@@ -203,7 +209,9 @@ public:
   }
 
   // Index of the currently-configured target within _targets, or -1.
+  // No target set at all maps to the synthetic "None" entry (always index 0).
   int currentTargetIndex() const {
+    if (!_prefs->locator_has_target) return 0;
     for (int i = 0; i < _target_n; i++) {
       if (_targets[i].kind == 1 && _prefs->locator_target_kind == 1) {
         if (memcmp(_targets[i].key, _prefs->locator_key, 6) == 0) return i;
@@ -216,6 +224,7 @@ public:
   }
 
   void applyTarget(const Target& t) {
+    if (t.kind == 2) { _task->clearTarget(); _dirty = true; return; }
     // Same target definition as every other entry point (UITask::setTarget),
     // but the save is deferred to screen exit (_dirty) so LEFT/RIGHT cycling
     // through candidates doesn't write flash on each step.
@@ -223,10 +232,9 @@ public:
     _dirty = true;
   }
 
-  // LEFT/RIGHT quick-cycle over the same set the picker shows.
+  // LEFT/RIGHT quick-cycle over the same set the picker shows (includes "None").
   void cycleTarget(int dir) {
     buildTargets();
-    if (_target_n == 0) { _task->showAlert("No targets available", 1400); return; }
     int cur = currentTargetIndex();
     int nx = (cur < 0) ? (dir >= 0 ? 0 : _target_n - 1)
                        : ((cur + (dir >= 0 ? 1 : _target_n - 1)) % _target_n);
@@ -236,7 +244,6 @@ public:
   void openPicker() {
     if (!_prefs) return;
     buildTargets();
-    if (_target_n == 0) { _task->showAlert("No targets available", 1400); return; }
     int cur = currentTargetIndex();
     _pick_sel = (cur >= 0) ? cur : 0;
     _pick_scroll = 0;

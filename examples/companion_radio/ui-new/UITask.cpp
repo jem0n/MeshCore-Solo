@@ -2375,6 +2375,12 @@ void UITask::setTargetNow(uint8_t kind, const uint8_t* key, int32_t lat, int32_t
   showAlert("Target set", 1200);
 }
 
+void UITask::clearTarget() {
+  if (!_node_prefs) return;
+  _node_prefs->locator_has_target = 0;
+  resetLocator();
+}
+
 // Homing beeper: while armed with a target and inside the radius, emit a short
 // tick whose interval shrinks linearly with distance — slow at the edge, rapid
 // near the centre. Polls distance a few times a second; silent outside the

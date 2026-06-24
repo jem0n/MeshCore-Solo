@@ -204,6 +204,9 @@ public:
   // such hook uses setTargetNow() to save + confirm on the spot.
   void setTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
   void setTargetNow(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
+  // Unset the active target (locator_has_target = 0). Distinct from setTarget()
+  // because there's no "kind" for nothing — clearing is its own operation.
+  void clearTarget();
   // Resolve a person target (6-byte pubkey prefix) to a current position:
   // prefers an active [LOC] live share, falls back to their last-advertised
   // GPS fix. Returns false when neither is known. Optional live/ts report
