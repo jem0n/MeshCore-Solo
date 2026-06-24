@@ -60,6 +60,15 @@ class LocatorScreen : public UIScreen {
     return R[i];
   }
 
+  // The homing Beeper only makes sense when "arrive" is part of the alert mode —
+  // it guides you toward the target while inside the radius. In pure "leave"
+  // mode (1) it's contradictory (silent outside, slows as you near the exit), so
+  // hide its row. Beeper is the last row, so this is just a shorter visible count;
+  // the beeper engine (UITask::locatorProximityBeeper) is gated on the mode too.
+  int visibleRows() const {
+    return (_prefs && _prefs->locator_mode == 1) ? ROW_COUNT - 1 : ROW_COUNT;
+  }
+
 public:
   LocatorScreen(UITask* task, NodePrefs* prefs) : _task(task), _prefs(prefs) {}
 
@@ -102,8 +111,10 @@ public:
     if (_picking) { renderPicker(display); return 400; }
     display.drawCenteredHeader("LOCATOR");
 
+    const int rc = visibleRows();
+    if (_sel >= rc) _sel = rc - 1;   // beeper row may have just been hidden
     const int valx = display.width() / 2 + 6;
-    drawList(display, ROW_COUNT, _sel, _scroll, [&](int i, int y, bool sel, int reserve) {
+    drawList(display, rc, _sel, _scroll, [&](int i, int y, bool sel, int reserve) {
       Row r = rows(i);
       display.drawSelectionRow(0, y - 1, display.width() - reserve, display.lineStep() - 1, sel);
       display.setCursor(4, y);
@@ -115,7 +126,7 @@ public:
     return 500;
   }
 
-  void moveSel(int dir) { _sel = (_sel + dir + ROW_COUNT) % ROW_COUNT; }
+  void moveSel(int dir) { int rc = visibleRows(); _sel = (_sel + dir + rc) % rc; }
 
   void activate(int dir) {
     if (!_prefs) return;

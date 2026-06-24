@@ -2391,7 +2391,7 @@ void UITask::locatorProximityBeeper() {
   static const uint32_t BEEP_MIN_MS = 150;    // fastest cadence (at the target)
   static const uint32_t BEEP_MAX_MS = 2000;   // slowest cadence (at the edge)
   if (!_node_prefs || !_node_prefs->locator_enabled || !_node_prefs->locator_beeper
-      || !_node_prefs->locator_has_target) {
+      || !_node_prefs->locator_has_target || _node_prefs->locator_mode == 1) {  // leave-only mode: no homing
     return;
   }
   if ((int32_t)(millis() - _locator_beep_check_ms) < 0) return;
