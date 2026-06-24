@@ -41,6 +41,12 @@ If a pinned contact has been removed from the contacts list, the tile shows `(go
 2. Recent DM contacts — listed after
 3. All remaining chat contacts — fallback when the first two tiers are empty (e.g. fresh install before any DMs)
 
+|            OLED            |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./fav_dial_2_oled.png) | ![](./fav_dial_2_eink.png) |
+
+<!-- screenshot pending: Pin-to-dial contact picker (favourites first, then recent DMs, then all contacts) -->
+
 Select a contact to pin it to that slot.
 
 **From a DM conversation** — **Hold Enter** › context menu › **Pin to dial**, then choose a slot from the slot picker (Slot 1–6, showing the current occupant name or "empty").

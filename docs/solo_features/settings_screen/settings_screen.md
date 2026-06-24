@@ -74,6 +74,12 @@ Lists all available home screen pages. For each entry:
 | Pwr save  | ON / OFF   | **Battery saver.** Hardware duty-cycle receive: the SX126x cycles RX↔sleep on its own and wakes on a preamble, cutting average RX current. Trades a little receive latency; leave OFF for lowest-latency reception. Requires an SX126x radio (otherwise stays on continuous RX). **Forced off (shown as `--`) while the repeater is on** — a repeater must listen continuously; your setting is restored when the repeater is switched off. |
 | Auto pwr  | ON / OFF   | **Adaptive Power Control.** Lowers actual TX power on strong links to save energy, ramping back up — to the **TX Pwr** ceiling — on weak or lost links. Link quality comes from direct-message ACK SNR and, for channel messages (no ACK), from hearing a repeater rebroadcast your packet. The radio page / name bar shows the live power. Default OFF (fixed TX power). **Suppressed (shown as `--`) while the repeater is on** — a repeater holds full TX power for consistent relay reach; your setting is restored when the repeater is switched off. |
 
+|           OLED            |           E-Ink           |
+| :-----------------------: | :-----------------------: |
+| ![](./set_scr_3_oled.png) | ![](./set_scr_3_eink.png) |
+
+<!-- screenshot pending: Radio — preset popup (pick/save/delete) and/or the digit-by-digit frequency editor -->
+
 The **repeater** mode and its flood filters live on their own screen — see **Tools › Repeater**.
 
 ---

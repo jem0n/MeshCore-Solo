@@ -52,4 +52,10 @@ Sensor fields show `--` when the sensor is not connected or has no data.
 
 ### Configuring fields
 
+|           OLED            |           E-Ink           |
+| :-----------------------: | :-----------------------: |
+| ![](./clk_scr_3_oled.png) | ![](./clk_scr_3_eink.png) |
+
+<!-- screenshot pending: Dashboard Config — three field slots cycled with LEFT/RIGHT -->
+
 **Hold Enter** (or press the **Context menu** key) on the Clock page to open the Dashboard Config screen, where each of the three field slots can be cycled with **LEFT/RIGHT**.

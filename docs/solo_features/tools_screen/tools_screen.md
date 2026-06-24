@@ -142,6 +142,13 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
 
 **Adding by coordinates** — open **Hold Enter → Waypoints** and select the **+ Add by coords** row (always the last entry in the list). This creates a waypoint without being there — no GPS fix required (handy for a meeting point or a spot read off a map). It opens a small form with three editable rows plus **Save**:
 
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_13_oled.png) | ![](./tls_scr_13_eink.png) |
+
+<!-- screenshot pending: Add-by-coords form — Lat/Lon scroll editor, hemisphere toggle, Label, Save -->
+
+
 - **Lat** / **Lon** — **Enter** opens the digit-by-digit scroll editor (the same widget as the radio frequency field): **LEFT/RIGHT** move the cursor between decimal places, **UP/DOWN** change the digit under it, **Enter** confirms. With the editor closed, **LEFT/RIGHT** on the row toggles the hemisphere — N/S for latitude, E/W for longitude.
 - **Label** — **Enter** to type a name (blank → auto `WP<n>`).
 - **Save** — validates the range and stores the waypoint. Missing or out-of-range values report a brief error.
@@ -156,6 +163,12 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
    To:  145° SE    ← absolute bearing to the target
    Hdg: 090° E     ← your current course over ground (-- when stationary)
 ```
+
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_12_oled.png) | ![](./tls_scr_12_eink.png) |
+
+<!-- screenshot pending: Waypoints navigation view — target label, distance, To/Hdg bearings (shared with Nearby/message Navigate) -->
 
 There is no magnetometer, so the screen shows two *absolute* bearings and you compare them: target at 145°, travelling at 90° → bear right. The **Hdg** line is derived from GPS movement (see Compass) and reads `--` until you move.
 
@@ -202,6 +215,12 @@ Periodically broadcasts a 0-hop advert with your GPS position. Configurable inte
 ---
 
 ## Live Share
+
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_11_oled.png) | ![](./tls_scr_11_eink.png) |
+
+<!-- screenshot pending: Live Share screen — Track loc / Auto share / To / Move / Min gap / Heartbeat rows -->
 
 Share your live position over the mesh **as ordinary chat messages**, and put other people who do the same on your map. A position is sent as a `[LOC]<lat>,<lon>` message — the same coordinate format waypoints use, so it stays readable on other firmware and the phone app (it just looks like a coordinate to anything that doesn't know the tag).
 
@@ -274,6 +293,12 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 ---
 
 ## Compass
+
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_14_oled.png) | ![](./tls_scr_14_eink.png) |
+
+<!-- screenshot pending: Compass — scrolling heading tape with centre pointer + large degrees/cardinal readout -->
 
 A heads-up GPS compass. The L1 has no magnetometer, so the heading is the **course over ground** — derived from how your GPS position moves over the last few seconds. The display is a horizontal **heading tape**: a fixed travel-direction pointer sits at the centre and the N..E..S..W scale scrolls underneath it as you turn, so whatever is under the pointer is your current course. A large numeric readout below shows that course in degrees and cardinal (e.g. `145° SE`).
 
@@ -374,6 +399,12 @@ Commands also work on the **monitored channel** (the one selected for channel mo
 
 ## Diagnostics
 
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_15_oled.png) | ![](./tls_scr_15_eink.png) |
+
+<!-- screenshot pending: Diagnostics — live device/mesh stats rows (uptime, rx/tx counters, heap, RSSI/SNR, queue, errors) -->
+
 A single read-only screen of live device and mesh stats, refreshed once a second. On a small OLED the rows scroll with **UP/DOWN**; on a larger e-ink display they all fit at once.
 
 | Row          | Shows                                                                                              |
@@ -400,6 +431,12 @@ The counters make the repeater behaviour observable: **Forwarded** confirms the 
 ---
 
 ## Repeater
+
+|           OLED             |           E-Ink            |
+| :------------------------: | :------------------------: |
+| ![](./tls_scr_16_oled.png) | ![](./tls_scr_16_eink.png) |
+
+<!-- screenshot pending: Repeater — toggle + Network/profile + flood-filter rows -->
 
 Turns the companion into a packet **repeater** while it keeps working as a normal companion — no separate firmware. By default, enabling it switches the radio to a dedicated repeater profile rather than relaying on whatever network you're chatting on (see **Network** below) — that matches the MeshCore community norm of repeaters sitting on a standard channel, not a private one. Loop-detection and an advert flood-depth cap are always applied. This screen keeps the toggle, the network/profile, and its flood-filter options together; live forwarding stats are on **Tools › Diagnostics**.
 
