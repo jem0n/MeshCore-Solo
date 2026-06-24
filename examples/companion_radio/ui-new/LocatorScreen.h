@@ -193,7 +193,7 @@ public:
       if (!c) continue;
       addPersonTarget(pre, c->name, /*require_position=*/false);
     }
-    for (int idx = 0; ; idx++) {
+    for (int idx = 0; _target_n < TARGET_MAX; idx++) {
       ContactInfo c;
       if (!the_mesh.getContactByIdx(idx, c)) break;
       addPersonTarget(c.id.pub_key, c.name, /*require_position=*/true);
