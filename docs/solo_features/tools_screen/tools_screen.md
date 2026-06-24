@@ -260,7 +260,7 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 | Setting | Options                          | Notes                                                                                  |
 | ------- | -------------------------------- | -------------------------------------------------------------------------------------- |
 | Alert   | ON / OFF                         | Master switch. Enabling without a target prompts you to pick one.                      |
-| Target  | person or waypoint               | **Enter** opens a picker — **favourites** first (offered even with no known position yet, so you can arm ahead of time), then any other contact with a currently-resolvable position (live-sharing *or* just last-advertised, e.g. a repeater), then waypoints; **UP/DOWN** + **Enter** to choose. **LEFT/RIGHT** quick-cycles the same set in place. A person is shown with an `@` prefix, plus a compact **age tag** (e.g. `@Bob (5m)`) when the position is last-advertised rather than a live share. Shows `none` until set. |
+| Target  | none / person / waypoint         | **Enter** opens a picker — **None** first (clears the target), then **favourites** (offered even with no known position yet, so you can arm ahead of time), then any other contact with a currently-resolvable position (live-sharing *or* just last-advertised, e.g. a repeater), then waypoints; **UP/DOWN** + **Enter** to choose. **LEFT/RIGHT** quick-cycles the same set in place, including back to **None**. A person is shown with an `@` prefix, plus a compact **age tag** (e.g. `@Bob (5m)`) when the position is last-advertised rather than a live share. Shows `none` until set. |
 | Radius  | 50 / 100 / 250 / 500 m / 1 km    | Geofence size.                                                                          |
 | Mode    | Arrive / Leave / Both            | Which crossing fires the alert — entering the radius, leaving it, or both.              |
 | Beeper  | ON / OFF                         | Optional homing tone (see below).                                                       |
@@ -279,7 +279,7 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 | :-----------------------------: | :-----------------------------: |
 | ![](./locator_picker_oled.png)       | ![](./locator_picker_eink.png)       |
 
-<!-- screenshot pending: PICK TARGET picker — favourites, a last-advertised contact with age tag (e.g. "@Bob (5m)"), and waypoints -->
+<!-- screenshot pending: PICK TARGET picker — None, favourites, a last-advertised contact with age tag (e.g. "@Bob (5m)"), and waypoints -->
 
 |              OLED               |              E-Ink              |
 | :-----------------------------: | :-----------------------------: |
