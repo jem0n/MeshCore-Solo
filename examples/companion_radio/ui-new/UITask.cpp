@@ -2272,23 +2272,37 @@ void UITask::loop() {
 // configured radius (m). Returns false when no target is set or there's no fix
 // — the single place the target-distance maths lives, shared by the crossing
 // evaluator and the proximity beeper.
+// One precedence for a person's position — an active [LOC] live share wins,
+// else the last-advertised GPS fix. Not everyone keeps live-sharing on, so the
+// fallback lets a rarely-updating but stationary node (a repeater, or someone
+// who shared a fix once) still work as a target.
+bool UITask::resolvePersonPos(const uint8_t* key, int32_t& lat, int32_t& lon,
+                              bool* live, uint32_t* ts) const {
+  if (live) *live = false;
+  if (ts)   *ts   = 0;
+  if (!key) return false;
+  const LiveTrackStore::Entry* e =
+      _livetrack.activeByKey(key, (uint32_t)rtc_clock.getCurrentTime());
+  if (e) {
+    lat = e->lat_1e6; lon = e->lon_1e6;
+    if (live) *live = true;
+    if (ts)   *ts   = e->ts;
+    return true;
+  }
+  ContactInfo* c = the_mesh.lookupContactByPubKey(key, NodePrefs::FAVOURITE_PREFIX_LEN);
+  if (c && (c->gps_lat != 0 || c->gps_lon != 0)) {
+    lat = c->gps_lat; lon = c->gps_lon;
+    if (ts) *ts = c->lastmod;
+    return true;
+  }
+  return false;
+}
+
 bool UITask::locatorDistance(float& dist_m, float& radius_m) const {
   if (!_node_prefs || !_node_prefs->locator_has_target) return false;
   int32_t tlat, tlon;
   if (_node_prefs->locator_target_kind == 1) {
-    // Live contact: prefer the latest [LOC] position. With no active share —
-    // not everyone keeps live-sharing on — fall back to their last-advertised
-    // position, so a rarely-updating but stationary node (a repeater, or a
-    // contact who simply shared a fix once) still works as a target.
-    const LiveTrackStore::Entry* e =
-        _livetrack.activeByKey(_node_prefs->locator_key, (uint32_t)rtc_clock.getCurrentTime());
-    if (e) {
-      tlat = e->lat_1e6; tlon = e->lon_1e6;
-    } else {
-      ContactInfo* c = the_mesh.lookupContactByPubKey(_node_prefs->locator_key, NodePrefs::FAVOURITE_PREFIX_LEN);
-      if (!c || (c->gps_lat == 0 && c->gps_lon == 0)) return false;
-      tlat = c->gps_lat; tlon = c->gps_lon;
-    }
+    if (!resolvePersonPos(_node_prefs->locator_key, tlat, tlon)) return false;
   } else {
     tlat = _node_prefs->locator_lat_1e6; tlon = _node_prefs->locator_lon_1e6;
   }
@@ -2333,17 +2347,22 @@ void UITask::fireLocator(bool arrived) {
     playMelody(arrived ? "locarr:d=8,o=6,b=140:c,e,g" : "loclv:d=8,o=6,b=140:g,e,c");
 }
 
-void UITask::setLocatorTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name) {
+void UITask::setTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name) {
   if (!_node_prefs) return;
   _node_prefs->locator_target_kind = kind;
-  if (kind == 1) memcpy(_node_prefs->locator_key, key, NodePrefs::FAVOURITE_PREFIX_LEN);
+  if (kind == 1 && key) memcpy(_node_prefs->locator_key, key, NodePrefs::FAVOURITE_PREFIX_LEN);
   _node_prefs->locator_lat_1e6 = lat;
   _node_prefs->locator_lon_1e6 = lon;
   snprintf(_node_prefs->locator_label, sizeof(_node_prefs->locator_label), "%s", name);
   _node_prefs->locator_has_target = 1;
+  resetLocator();   // re-seed the crossing engine so the change can't fire on a stale state
+}
+
+void UITask::setTargetNow(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name) {
+  if (!_node_prefs) return;
+  setTarget(kind, key, lat, lon, name);
   the_mesh.savePrefs();
-  resetLocator();
-  showAlert("Locator target set", 1200);
+  showAlert("Target set", 1200);
 }
 
 // Homing beeper: while armed with a target and inside the radius, emit a short

@@ -283,10 +283,10 @@ public:
             else            snprintf(text, sizeof(text), WAYPOINT_MSG_TAG "%.5f,%.5f", lat, lon);
             _task->shareToMessage(text);   // hands off to the Messages screen
           }
-        } else {                                          // Set Locator target
+        } else {                                          // Set as target
           if (wi >= 0 && wi < _task->waypoints().count()) {
             const Waypoint& w = _task->waypoints().at(wi);
-            _task->setLocatorTarget(0, nullptr, w.lat_1e6, w.lon_1e6, w.label);
+            _task->setTargetNow(0, nullptr, w.lat_1e6, w.lon_1e6, w.label);
           }
         }
       }
@@ -348,7 +348,7 @@ public:
       _ctx.addItem("Rename");
       _ctx.addItem("Delete");
       _ctx.addItem("Send");
-      _ctx.addItem("Locator target");
+      _ctx.addItem("Set as target");
       return true;
     }
     return true;

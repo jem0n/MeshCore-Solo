@@ -470,7 +470,7 @@ class NearbyScreen : public UIScreen {
     if (has_gps) add("Save waypoint", ACT_WAYPOINT);
     // Needs both a position and a stable identity — a person target is keyed
     // by pubkey prefix, so a name-only live-scan/channel row can't offer this.
-    if (has_gps && has_key) add("Set Locator target", ACT_LOCATOR);
+    if (has_gps && has_key) add("Set as target", ACT_LOCATOR);
     if (stored) add(_sort_label, ACT_SORT);   // sort is meaningless for live-scan rows
     add(stored ? "Discover scan" : "Rescan", ACT_SCAN);
   }
@@ -494,7 +494,7 @@ class NearbyScreen : public UIScreen {
       case ACT_LOCATOR: {
         const Entry* e = selected();
         if (e && e->has_key && (e->lat_e6 != 0 || e->lon_e6 != 0))
-          _task->setLocatorTarget(1, e->pub_key, e->lat_e6, e->lon_e6, e->name);
+          _task->setTargetNow(1, e->pub_key, e->lat_e6, e->lon_e6, e->name);
         break;
       }
       case ACT_SORT:     break;  // adjusted in-place via LEFT/RIGHT, not ENTER

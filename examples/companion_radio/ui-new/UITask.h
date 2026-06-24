@@ -194,13 +194,23 @@ public:
   // silently (called by the Locator tool after the target/radius changes,
   // so re-entering the zone doesn't fire on a stale inside/outside state).
   void resetLocator() { _locator_known = false; }
-  // Quick one-shot "make this my Locator target" — used by Nearby Nodes' and
-  // Waypoints' per-item menus so picking a target doesn't require a detour
-  // through Tools › Locator. Unlike LocatorScreen's own picker (which batches
-  // edits and saves on exit), this saves and re-arms immediately, with an
-  // on-screen confirmation, since there's no screen-exit point to hook here.
-  // kind 0 = waypoint (key ignored), 1 = person (key required, 6-byte prefix).
-  void setLocatorTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
+  // The one "active target" the device tracks — shared by the Locator geofence,
+  // the Nav bearing/ETA view and (future) the map focus, so every entry point
+  // sets the same thing. kind 0 = waypoint (key ignored), 1 = person (key
+  // required, 6-byte prefix). setTarget() only *defines* the target (fields +
+  // re-arm); the caller decides when to persist. Two commit policies, by
+  // context: a screen with an exit hook (LocatorScreen) batches the save so
+  // LEFT/RIGHT cycling doesn't thrash flash, while a per-item popup with no
+  // such hook uses setTargetNow() to save + confirm on the spot.
+  void setTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
+  void setTargetNow(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
+  // Resolve a person target (6-byte pubkey prefix) to a current position:
+  // prefers an active [LOC] live share, falls back to their last-advertised
+  // GPS fix. Returns false when neither is known. Optional live/ts report
+  // freshness for the picker's age tag. One precedence, used by both the
+  // Locator engine (locatorDistance) and the target picker.
+  bool resolvePersonPos(const uint8_t* key, int32_t& lat, int32_t& lon,
+                        bool* live = nullptr, uint32_t* ts = nullptr) const;
   void gotoTrailScreen();
   void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();

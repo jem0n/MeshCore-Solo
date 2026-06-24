@@ -9,9 +9,9 @@
 // (favourites first — offered even with no known position yet, so you can arm
 // ahead of time — then any other contact with a currently-known position:
 // live-sharing or just last-advertised, e.g. a repeater; then waypoints).
-// LEFT/RIGHT quick-cycles the same set. A target can also be set directly from
-// Nearby Nodes' or Waypoints' own menu (UITask::setLocatorTarget()), bypassing
-// this picker entirely.
+// LEFT/RIGHT quick-cycles the same set. The same active target can also be set
+// directly from Nearby Nodes' or Waypoints' own "Set as target" menu item
+// (UITask::setTargetNow()), bypassing this picker entirely.
 // Included by UITask.cpp after LiveShareScreen.h.
 
 #include "../NodePrefs.h"
@@ -160,14 +160,8 @@ public:
       if (_targets[j].kind == 1 && memcmp(_targets[j].key, key, 6) == 0) return false;  // already added
 
     int32_t lat = 0, lon = 0; uint32_t ts = 0; bool live = false;
-    const LiveTrackStore::Entry* e = _task->liveTrack().activeByKey(key, rtc_clock.getCurrentTime());
-    if (e) {
-      live = true; ts = e->ts; lat = e->lat_1e6; lon = e->lon_1e6;
-    } else {
-      ContactInfo* c = the_mesh.lookupContactByPubKey(key, 6);
-      if (c && (c->gps_lat || c->gps_lon)) { ts = c->lastmod; lat = c->gps_lat; lon = c->gps_lon; }
-    }
-    if (require_position && !live && ts == 0) return false;   // nothing to navigate to yet
+    bool has_pos = _task->resolvePersonPos(key, lat, lon, &live, &ts);  // same precedence as the engine
+    if (require_position && !has_pos) return false;   // nothing to navigate to yet
 
     Target& t = _targets[_target_n++];
     t.kind = 1; t.lat = lat; t.lon = lon; t.ts = ts; t.live = live;
@@ -222,14 +216,11 @@ public:
   }
 
   void applyTarget(const Target& t) {
-    _prefs->locator_target_kind = t.kind;
-    if (t.kind == 1) memcpy(_prefs->locator_key, t.key, 6);
-    _prefs->locator_lat_1e6 = t.lat;
-    _prefs->locator_lon_1e6 = t.lon;
-    snprintf(_prefs->locator_label, sizeof(_prefs->locator_label), "%s", t.name);
-    _prefs->locator_has_target = 1;
+    // Same target definition as every other entry point (UITask::setTarget),
+    // but the save is deferred to screen exit (_dirty) so LEFT/RIGHT cycling
+    // through candidates doesn't write flash on each step.
+    _task->setTarget(t.kind, t.kind == 1 ? t.key : nullptr, t.lat, t.lon, t.name);
     _dirty = true;
-    _task->resetLocator();
   }
 
   // LEFT/RIGHT quick-cycle over the same set the picker shows.
