@@ -45,11 +45,12 @@ class QuickMsgScreen : public UIScreen {
   FullscreenMsgView _fs;
   int  _unread_at_entry;    // _ch_unread value when entering CHANNEL_HIST
   int  _viewing_max_seen;  // highest _hist_sel reached in current session
-  // Shared ring for all channels combined. Sized to comfortably exceed
-  // typical inter-visit accumulation; addChannelMsg() decrements the
+  // Shared ring for all channels combined. addChannelMsg() decrements the
   // matching _ch_unread when an entry is evicted so the badge can't claim
-  // unread messages that no longer exist in the ring.
-  static const int CH_HIST_MAX = 96;
+  // unread messages that no longer exist in the ring. Each slot carries a full
+  // MSG_TEXT_BUF, so this ring dominates the screen's RAM footprint — kept
+  // modest to leave heap headroom (see DM_HIST_MAX).
+  static const int CH_HIST_MAX = 48;
 
   // KEYBOARD
   KeyboardWidget* _kb;
@@ -126,7 +127,8 @@ class QuickMsgScreen : public UIScreen {
     uint8_t  attempt;          // last attempt number sent (outgoing); next resend = attempt+1
     uint8_t  resends_left;     // remaining auto-resends before the marker shows ✗
   };
-  static const int DM_HIST_MAX = 64;
+  // Each slot carries a full MSG_TEXT_BUF; kept modest to bound heap use.
+  static const int DM_HIST_MAX = 32;
   DmHistEntry _dm_hist[DM_HIST_MAX];
   int _dm_hist_head, _dm_hist_count;
   int _dm_hist_sel, _dm_hist_scroll;
