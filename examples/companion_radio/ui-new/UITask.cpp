@@ -2264,12 +2264,19 @@ bool UITask::locatorDistance(float& dist_m, float& radius_m) const {
   if (!_node_prefs || !_node_prefs->locator_has_target) return false;
   int32_t tlat, tlon;
   if (_node_prefs->locator_target_kind == 1) {
-    // Live contact: follow the latest [LOC] position. No recent share → no
-    // distance to evaluate (engine waits rather than using a stale fix).
+    // Live contact: prefer the latest [LOC] position. With no active share —
+    // not everyone keeps live-sharing on — fall back to their last-advertised
+    // position, so a rarely-updating but stationary node (a repeater, or a
+    // contact who simply shared a fix once) still works as a target.
     const LiveTrackStore::Entry* e =
         _livetrack.activeByKey(_node_prefs->locator_key, (uint32_t)rtc_clock.getCurrentTime());
-    if (!e) return false;
-    tlat = e->lat_1e6; tlon = e->lon_1e6;
+    if (e) {
+      tlat = e->lat_1e6; tlon = e->lon_1e6;
+    } else {
+      ContactInfo* c = the_mesh.lookupContactByPubKey(_node_prefs->locator_key, NodePrefs::FAVOURITE_PREFIX_LEN);
+      if (!c || (c->gps_lat == 0 && c->gps_lon == 0)) return false;
+      tlat = c->gps_lat; tlon = c->gps_lon;
+    }
   } else {
     tlat = _node_prefs->locator_lat_1e6; tlon = _node_prefs->locator_lon_1e6;
   }
@@ -2312,6 +2319,19 @@ void UITask::fireLocator(bool arrived) {
   showAlert(msg, 3000);
   if (!isBuzzerQuiet())
     playMelody(arrived ? "locarr:d=8,o=6,b=140:c,e,g" : "loclv:d=8,o=6,b=140:g,e,c");
+}
+
+void UITask::setLocatorTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name) {
+  if (!_node_prefs) return;
+  _node_prefs->locator_target_kind = kind;
+  if (kind == 1) memcpy(_node_prefs->locator_key, key, NodePrefs::FAVOURITE_PREFIX_LEN);
+  _node_prefs->locator_lat_1e6 = lat;
+  _node_prefs->locator_lon_1e6 = lon;
+  snprintf(_node_prefs->locator_label, sizeof(_node_prefs->locator_label), "%s", name);
+  _node_prefs->locator_has_target = 1;
+  the_mesh.savePrefs();
+  resetLocator();
+  showAlert("Locator target set", 1200);
 }
 
 // Homing beeper: while armed with a target and inside the radius, emit a short

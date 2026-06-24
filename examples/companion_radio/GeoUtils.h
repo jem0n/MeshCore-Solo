@@ -61,6 +61,19 @@ static inline void fmtDist(char* buf, int n, float km, bool imperial) {
   }
 }
 
+// Compact age tag for a timestamp, e.g. "12s" / "5m" / "3h" / "2d" — sized to
+// sit inline after a name (unlike a full "X ago" sentence). Empty string for
+// an unknown (0) or future timestamp. Takes `now` rather than reading the RTC
+// itself, so this stays a pure function like the rest of this file.
+static inline void fmtAgeShort(char* buf, int n, uint32_t now, uint32_t lastmod) {
+  if (lastmod == 0 || now < lastmod) { buf[0] = '\0'; return; }
+  uint32_t age = now - lastmod;
+  if      (age < 60)    snprintf(buf, n, "%us", (unsigned)age);
+  else if (age < 3600)  snprintf(buf, n, "%um", (unsigned)(age / 60));
+  else if (age < 86400) snprintf(buf, n, "%uh", (unsigned)(age / 3600));
+  else                  snprintf(buf, n, "%ud", (unsigned)(age / 86400));
+}
+
 // Tag marking a shared waypoint inside a message: "[WAY]<lat>,<lon> <label>".
 // A plain {loc} expansion ("<lat>,<lon>") parses too — the tag just adds intent
 // and a label, and keeps the text readable on apps/firmware that don't know it.

@@ -194,6 +194,13 @@ public:
   // silently (called by the Locator tool after the target/radius changes,
   // so re-entering the zone doesn't fire on a stale inside/outside state).
   void resetLocator() { _locator_known = false; }
+  // Quick one-shot "make this my Locator target" — used by Nearby Nodes' and
+  // Waypoints' per-item menus so picking a target doesn't require a detour
+  // through Tools › Locator. Unlike LocatorScreen's own picker (which batches
+  // edits and saves on exit), this saves and re-arms immediately, with an
+  // on-screen confirmation, since there's no screen-exit point to hook here.
+  // kind 0 = waypoint (key ignored), 1 = person (key required, 6-byte prefix).
+  void setLocatorTarget(uint8_t kind, const uint8_t* key, int32_t lat, int32_t lon, const char* name);
   void gotoTrailScreen();
   void gotoMapScreen();   // opens the Trail screen directly in its Map view
   void gotoCompassScreen();

@@ -6,13 +6,18 @@
 // of (leave/away) the radius. A waypoint target is snapshotted (coord + label);
 // a person target follows their latest shared position. The crossing engine
 // lives in UITask::evaluateLocator(). The Target row's Enter opens a picker
-// (favourites first, then active live senders, then waypoints); LEFT/RIGHT
-// quick-cycles the same set.
+// (favourites first — offered even with no known position yet, so you can arm
+// ahead of time — then any other contact with a currently-known position:
+// live-sharing or just last-advertised, e.g. a repeater; then waypoints).
+// LEFT/RIGHT quick-cycles the same set. A target can also be set directly from
+// Nearby Nodes' or Waypoints' own menu (UITask::setLocatorTarget()), bypassing
+// this picker entirely.
 // Included by UITask.cpp after LiveShareScreen.h.
 
 #include "../NodePrefs.h"
 #include "../Waypoint.h"
 #include "../LiveTrack.h"
+#include "../GeoUtils.h"
 #include "icons.h"   // drawList (shared scrolling-list helper)
 
 class LocatorScreen : public UIScreen {
@@ -23,11 +28,20 @@ class LocatorScreen : public UIScreen {
   int        _scroll = 0;
 
   // Target picker (Enter on the Target row): a flat selectable list of people
-  // and places, rebuilt from favourites / live senders / waypoints on open.
+  // and places, rebuilt from favourites / known-position contacts / waypoints
+  // on open. `live` + `ts` are picker-display-only (freshness), never written
+  // to prefs — a person target is re-resolved by key at evaluation time.
   bool       _picking = false;
   int        _pick_sel = 0, _pick_scroll = 0;
-  struct Target { uint8_t kind; int32_t lat, lon; uint8_t key[6]; char name[20]; };  // kind 0=waypoint 1=person
-  static const int TARGET_MAX = 24;
+  struct Target {
+    uint8_t  kind;            // 0=waypoint 1=person
+    int32_t  lat, lon;
+    uint8_t  key[6];
+    char     name[20];
+    uint32_t ts;              // last position update (0 = unknown), for the age tag
+    bool     live;            // true = an active [LOC] share right now
+  };
+  static const int TARGET_MAX = 40;
   Target _targets[TARGET_MAX];
   int    _target_n = 0;
 
@@ -134,37 +148,55 @@ public:
     _task->resetLocator();
   }
 
+  // Add a person candidate to _targets, deduped by pubkey prefix. Freshness is
+  // resolved here for display only: an active [LOC] share wins (live=true),
+  // else the contact's last-advertised position if it has one — the same
+  // precedence UITask::locatorDistance() uses at evaluation time. When
+  // `require_position` is false (favourites), a contact with neither is still
+  // added with no position — "arm ahead of time", per the existing feature.
+  bool addPersonTarget(const uint8_t* key, const char* name, bool require_position) {
+    if (_target_n >= TARGET_MAX) return false;
+    for (int j = 0; j < _target_n; j++)
+      if (_targets[j].kind == 1 && memcmp(_targets[j].key, key, 6) == 0) return false;  // already added
+
+    int32_t lat = 0, lon = 0; uint32_t ts = 0; bool live = false;
+    const LiveTrackStore::Entry* e = _task->liveTrack().activeByKey(key, rtc_clock.getCurrentTime());
+    if (e) {
+      live = true; ts = e->ts; lat = e->lat_1e6; lon = e->lon_1e6;
+    } else {
+      ContactInfo* c = the_mesh.lookupContactByPubKey(key, 6);
+      if (c && (c->gps_lat || c->gps_lon)) { ts = c->lastmod; lat = c->gps_lat; lon = c->gps_lon; }
+    }
+    if (require_position && !live && ts == 0) return false;   // nothing to navigate to yet
+
+    Target& t = _targets[_target_n++];
+    t.kind = 1; t.lat = lat; t.lon = lon; t.ts = ts; t.live = live;
+    memcpy(t.key, key, 6);
+    snprintf(t.name, sizeof(t.name), "%s", name);
+    return true;
+  }
+
   // Build the selectable target set into _targets: favourites first (the quick
-  // path you pin ahead of time), then active verified live senders not already
-  // pinned, then saved waypoints. A person is keyed by pubkey prefix so the
-  // engine follows their live position even before/independent of a [LOC].
+  // path you pin ahead of time, offered even with no known position yet), then
+  // any other contact with a currently-known position — live-sharing or just
+  // last-advertised (a repeater, a room, or someone who shared a fix once) —
+  // then saved waypoints. A person is keyed by pubkey prefix so the engine
+  // re-resolves their position each evaluation rather than trusting a snapshot.
   void buildTargets() {
     _target_n = 0;
-    for (int i = 0; i < NodePrefs::FAVOURITES_COUNT && _target_n < TARGET_MAX; i++) {
+    for (int i = 0; i < NodePrefs::FAVOURITES_COUNT; i++) {
       const uint8_t* pre = _prefs->favourite_contacts[i];
       bool empty = true;
       for (int b = 0; b < NodePrefs::FAVOURITE_PREFIX_LEN; b++) if (pre[b]) { empty = false; break; }
       if (empty) continue;
       ContactInfo* c = the_mesh.lookupContactByPubKey(pre, NodePrefs::FAVOURITE_PREFIX_LEN);
       if (!c) continue;
-      Target& t = _targets[_target_n++];
-      t.kind = 1; t.lat = t.lon = 0;
-      memcpy(t.key, pre, 6);
-      snprintf(t.name, sizeof(t.name), "%s", c->name);
+      addPersonTarget(pre, c->name, /*require_position=*/false);
     }
-    LiveTrackStore& lt = _task->liveTrack();
-    uint32_t now = rtc_clock.getCurrentTime();
-    for (int i = 0; i < LiveTrackStore::CAPACITY && _target_n < TARGET_MAX; i++) {
-      if (!lt.isActive(i, now) || !lt.slotAt(i).verified) continue;
-      const LiveTrackStore::Entry& e = lt.slotAt(i);
-      bool dup = false;
-      for (int j = 0; j < _target_n; j++)
-        if (_targets[j].kind == 1 && memcmp(_targets[j].key, e.key, 6) == 0) { dup = true; break; }
-      if (dup) continue;
-      Target& t = _targets[_target_n++];
-      t.kind = 1; t.lat = e.lat_1e6; t.lon = e.lon_1e6;
-      memcpy(t.key, e.key, 6);
-      snprintf(t.name, sizeof(t.name), "%s", e.name);
+    for (int idx = 0; ; idx++) {
+      ContactInfo c;
+      if (!the_mesh.getContactByIdx(idx, c)) break;
+      addPersonTarget(c.id.pub_key, c.name, /*require_position=*/true);
     }
     WaypointStore& wp = _task->waypoints();
     for (int i = 0; i < wp.count() && _target_n < TARGET_MAX; i++) {
@@ -203,7 +235,7 @@ public:
   // LEFT/RIGHT quick-cycle over the same set the picker shows.
   void cycleTarget(int dir) {
     buildTargets();
-    if (_target_n == 0) { _task->showAlert("No favs / waypoints", 1400); return; }
+    if (_target_n == 0) { _task->showAlert("No targets available", 1400); return; }
     int cur = currentTargetIndex();
     int nx = (cur < 0) ? (dir >= 0 ? 0 : _target_n - 1)
                        : ((cur + (dir >= 0 ? 1 : _target_n - 1)) % _target_n);
@@ -213,7 +245,7 @@ public:
   void openPicker() {
     if (!_prefs) return;
     buildTargets();
-    if (_target_n == 0) { _task->showAlert("No favs / waypoints", 1400); return; }
+    if (_target_n == 0) { _task->showAlert("No targets available", 1400); return; }
     int cur = currentTargetIndex();
     _pick_sel = (cur >= 0) ? cur : 0;
     _pick_scroll = 0;
@@ -222,12 +254,22 @@ public:
 
   void renderPicker(DisplayDriver& display) {
     display.drawCenteredHeader("PICK TARGET");
+    uint32_t now = rtc_clock.getCurrentTime();
     drawList(display, _target_n, _pick_sel, _pick_scroll, [&](int i, int y, bool sel, int reserve) {
       display.drawSelectionRow(0, y - 1, display.width() - reserve, display.lineStep() - 1, sel);
-      char row[28];
-      // '@' marks a person; a plain name is a waypoint.
-      if (_targets[i].kind == 1) snprintf(row, sizeof(row), "@%s", _targets[i].name);
-      else                       snprintf(row, sizeof(row), "%s", _targets[i].name);
+      const Target& t = _targets[i];
+      char row[36];
+      if (t.kind != 1) {
+        snprintf(row, sizeof(row), "%s", t.name);          // a plain name is a waypoint
+      } else if (t.live) {
+        snprintf(row, sizeof(row), "@%s", t.name);          // '@' marks a person; live needs no age tag
+      } else if (t.ts) {
+        char age[8];
+        geo::fmtAgeShort(age, sizeof(age), now, t.ts);
+        snprintf(row, sizeof(row), "@%s (%s)", t.name, age);   // last-advertised, not actively sharing
+      } else {
+        snprintf(row, sizeof(row), "@%s", t.name);          // favourite, no position known yet
+      }
       display.drawTextEllipsized(2, y, display.width() - 2 - reserve, row);
     });
   }

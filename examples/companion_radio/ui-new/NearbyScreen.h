@@ -28,7 +28,7 @@ class NearbyScreen : public UIScreen {
   enum Source : uint8_t { SRC_STORED, SRC_SCAN };
 
   // ── action-menu actions (matched by id, not by row index) ────────────────────
-  enum Action : uint8_t { ACT_NAV, ACT_PING, ACT_WAYPOINT, ACT_SORT, ACT_SCAN };
+  enum Action : uint8_t { ACT_NAV, ACT_PING, ACT_WAYPOINT, ACT_LOCATOR, ACT_SORT, ACT_SCAN };
 
   // ── unified list entry ───────────────────────────────────────────────────────
   struct Entry {
@@ -459,7 +459,7 @@ class NearbyScreen : public UIScreen {
 
     buildSortLabel();
     _menu_action_count = 0;
-    _menu.begin("Options", 6);
+    _menu.begin("Options", 7);
     auto add = [&](const char* label, Action a) {
       _menu.addItem(label);
       _menu_actions[_menu_action_count++] = a;
@@ -468,6 +468,9 @@ class NearbyScreen : public UIScreen {
     if (has_gps) add("Navigate",      ACT_NAV);
     if (has_key) add("Ping",          ACT_PING);
     if (has_gps) add("Save waypoint", ACT_WAYPOINT);
+    // Needs both a position and a stable identity — a person target is keyed
+    // by pubkey prefix, so a name-only live-scan/channel row can't offer this.
+    if (has_gps && has_key) add("Set Locator target", ACT_LOCATOR);
     if (stored) add(_sort_label, ACT_SORT);   // sort is meaningless for live-scan rows
     add(stored ? "Discover scan" : "Rescan", ACT_SCAN);
   }
@@ -488,6 +491,12 @@ class NearbyScreen : public UIScreen {
         break;
       }
       case ACT_WAYPOINT: saveSelectedWaypoint(); break;
+      case ACT_LOCATOR: {
+        const Entry* e = selected();
+        if (e && e->has_key && (e->lat_e6 != 0 || e->lon_e6 != 0))
+          _task->setLocatorTarget(1, e->pub_key, e->lat_e6, e->lon_e6, e->name);
+        break;
+      }
       case ACT_SORT:     break;  // adjusted in-place via LEFT/RIGHT, not ENTER
       case ACT_SCAN:     enterScan();            break;
     }

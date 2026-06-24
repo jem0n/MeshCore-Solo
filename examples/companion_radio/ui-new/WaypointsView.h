@@ -274,7 +274,7 @@ public:
             if (_sel >= wpListCount()) _sel = wpListCount() - 1;
             if (_sel < 0) _sel = 0;
           }
-        } else {                                          // Send (share in a message)
+        } else if (sel == 2) {                            // Send (share in a message)
           if (wi >= 0 && wi < _task->waypoints().count()) {
             const Waypoint& w = _task->waypoints().at(wi);
             double lat = w.lat_1e6 / 1000000.0, lon = w.lon_1e6 / 1000000.0;
@@ -282,6 +282,11 @@ public:
             if (w.label[0]) snprintf(text, sizeof(text), WAYPOINT_MSG_TAG "%.5f,%.5f %s", lat, lon, w.label);
             else            snprintf(text, sizeof(text), WAYPOINT_MSG_TAG "%.5f,%.5f", lat, lon);
             _task->shareToMessage(text);   // hands off to the Messages screen
+          }
+        } else {                                          // Set Locator target
+          if (wi >= 0 && wi < _task->waypoints().count()) {
+            const Waypoint& w = _task->waypoints().at(wi);
+            _task->setLocatorTarget(0, nullptr, w.lat_1e6, w.lon_1e6, w.label);
           }
         }
       }
@@ -336,13 +341,14 @@ public:
       else           _mode = NAV;            // a waypoint / Trail-start row
       return true;
     }
-    // Rename/Delete/Send apply to saved waypoints only — not Trail-start or Add.
+    // Rename/Delete/Send/Locator apply to saved waypoints only — not Trail-start or Add.
     if (c == KEY_CONTEXT_MENU && !selIsStart() && _sel != n &&
         wpIndex() >= 0 && wpIndex() < _task->waypoints().count()) {
-      _ctx.begin("Waypoint", 3);
+      _ctx.begin("Waypoint", 4);
       _ctx.addItem("Rename");
       _ctx.addItem("Delete");
       _ctx.addItem("Send");
+      _ctx.addItem("Locator target");
       return true;
     }
     return true;
