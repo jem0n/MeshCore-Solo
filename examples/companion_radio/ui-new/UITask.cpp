@@ -475,6 +475,16 @@ class HomeScreen : public UIScreen {
         leftmostX = aX - 1;
       }
 
+      // Live location sharing active. Same blink convention — another
+      // "leave it on and forget" broadcast, like auto-advert above. Reuses
+      // the diamond the map uses for a live-tracked contact, so the glyph
+      // already means "sharing position" elsewhere in the UI.
+      if (_node_prefs && _node_prefs->loc_share_enabled) {
+        int lsX = leftmostX - ind;
+        if (blinkOn()) drawBoxedIcon(display, lsX, ind, ind_h, ICON_MAP_CONTACT);
+        leftmostX = lsX - 1;
+      }
+
       // GPS trail logging active. Same blink convention.
       if (_task->trail().isActive()) {
         int gX = leftmostX - ind;
@@ -1210,8 +1220,10 @@ public:
     // Any blinking status-bar indicator needs a 1 s refresh to animate evenly —
     // but the status bar (and its icons) is hidden on the CLOCK page, so don't
     // pay the 1 s cadence there for icons that aren't drawn.
-    bool repeating = _node_prefs && _node_prefs->client_repeat;
-    bool need_blink = (_page != HomePage::CLOCK) && (auto_adv || _task->trail().isActive() || repeating);
+    bool repeating  = _node_prefs && _node_prefs->client_repeat;
+    bool loc_sharing = _node_prefs && _node_prefs->loc_share_enabled;
+    bool need_blink = (_page != HomePage::CLOCK) &&
+                       (auto_adv || _task->trail().isActive() || repeating || loc_sharing);
     if (Features::IS_EINK) {
       // slow display: poll every 30 s; inbound msgs force immediate refresh via notify()
       return Features::HOME_REFRESH_MS;
