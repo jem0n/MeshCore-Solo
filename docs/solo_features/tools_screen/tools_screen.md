@@ -6,7 +6,7 @@
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_1_oled.png) | ![](./tls_scr_1_eink.png) |
+| ![](./overview_oled.png) | ![](./overview_eink.png) |
 
 The Tools screen is a hub for GPS trail recording, nearby node browsing, ringtone editing, auto-reply bot, auto-advert, live location sharing, locator, compass, device diagnostics, and repeater mode. Tools are grouped into collapsible **Location** / **Comms** / **System** sections — the same fold-in-place model as Settings; Tools always opens folded back to the section list. Navigate with **UP/DOWN**, press **Enter** on a section header to expand or collapse it, or on a tool to open it.
 
@@ -16,7 +16,7 @@ The Tools screen is a hub for GPS trail recording, nearby node browsing, rington
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_2_oled.png) | ![](./tls_scr_2_eink.png) |
+| ![](./nearby_oled.png) | ![](./nearby_eink.png) |
 
 Browse nodes that have recently advertised on the mesh. **Filter** (which nodes) and **sort** (in what order) are independent axes and combine freely.
 
@@ -50,7 +50,7 @@ Selecting **Ping** opens the Ping popup:
 
 |              OLED              |             E-Ink              |
 | :----------------------------: | :----------------------------: |
-| ![](./tls_scr_2_ping_oled.png) | ![](./tls_scr_2_ping_eink.png) |
+| ![](./nearby_ping_oled.png) | ![](./nearby_ping_eink.png) |
 
 Use **Enter** on the popup’s `Ping` row to send a direct mesh ping to that node. The popup then shows the RTT and SNR values on the next lines, and can be used again immediately for another ping.
 
@@ -63,7 +63,7 @@ Use **Enter** on the popup’s `Ping` row to send a direct mesh ping to that nod
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_3_oled.png) | ![](./tls_scr_3_eink.png) |
+| ![](./nearby_scan_oled.png) | ![](./nearby_scan_eink.png) |
 
 **Options → Discover scan** sends a `NODE_DISCOVER_REQ`. Repeaters, sensors and room servers within zero-hop range respond immediately with name, type and signal data. This is not a separate screen — it is the **same list switched to a live-scan source**: the right-hand column shows **RSSI** instead of distance, and node detail shows the public key, signal data and contact status.
 
@@ -77,7 +77,7 @@ Because it is the same list, all the same keys apply — **UP/DOWN** to navigate
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_4_oled.png) | ![](./tls_scr_4_eink.png) |
+| ![](./trail_summary_oled.png) | ![](./trail_summary_eink.png) |
 
 Records your route in a RAM ring buffer (up to 1024 points, sampled every 1 s). The track is **simplified as it's recorded** — a long straight stretch is kept as just its two endpoints while curves keep their detail (bounded to within the **Min dist** tolerance of the real path), so the buffer covers a far longer route than a flat point budget would suggest. Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
 
@@ -96,7 +96,7 @@ Cycle views with **LEFT / RIGHT**:
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_5_oled.png) | ![](./tls_scr_5_eink.png) |
+| ![](./trail_map_oled.png) | ![](./trail_map_eink.png) |
 
 **Hold Enter** opens the **action menu**. It is two-level — a short main menu, plus **Trail file…** and **Settings…** submenus. **Cancel/Back** in a submenu returns to the main menu.
 
@@ -144,7 +144,7 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_13_oled.png) | ![](./tls_scr_13_eink.png) |
+| ![](./waypoint_add_oled.png) | ![](./waypoint_add_eink.png) |
 
 <!-- screenshot pending: Add-by-coords form — Lat/Lon scroll editor, hemisphere toggle, Label, Save -->
 
@@ -166,7 +166,7 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_12_oled.png) | ![](./tls_scr_12_eink.png) |
+| ![](./waypoint_nav_oled.png) | ![](./waypoint_nav_eink.png) |
 
 <!-- screenshot pending: Waypoints navigation view — target label, distance, To/Hdg bearings (shared with Nearby/message Navigate) -->
 
@@ -218,7 +218,7 @@ Periodically broadcasts a 0-hop advert with your GPS position. Configurable inte
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_11_oled.png) | ![](./tls_scr_11_eink.png) |
+| ![](./liveshare_oled.png) | ![](./liveshare_eink.png) |
 
 <!-- screenshot pending: Live Share screen — Track loc / Auto share / To / Move / Min gap / Heartbeat rows -->
 
@@ -249,7 +249,7 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_8_oled.png) | ![](./tls_scr_8_eink.png) |
+| ![](./locator_oled.png) | ![](./locator_eink.png) |
 
 <!-- screenshot pending: Locator screen with a target set (e.g. "@Bob (5m)"), radius/mode/beeper rows -->
 
@@ -277,13 +277,13 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 
 |              OLED               |              E-Ink              |
 | :-----------------------------: | :-----------------------------: |
-| ![](./tls_scr_9_oled.png)       | ![](./tls_scr_9_eink.png)       |
+| ![](./locator_picker_oled.png)       | ![](./locator_picker_eink.png)       |
 
 <!-- screenshot pending: PICK TARGET picker — favourites, a last-advertised contact with age tag (e.g. "@Bob (5m)"), and waypoints -->
 
 |              OLED               |              E-Ink              |
 | :-----------------------------: | :-----------------------------: |
-| ![](./tls_scr_10_oled.png)      | ![](./tls_scr_10_eink.png)      |
+| ![](./map_target_oled.png)      | ![](./map_target_eink.png)      |
 
 <!-- screenshot pending: Trail Map (or home Map preview) with the active-target flag marker visible -->
 
@@ -296,7 +296,7 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_14_oled.png) | ![](./tls_scr_14_eink.png) |
+| ![](./compass_oled.png) | ![](./compass_eink.png) |
 
 <!-- screenshot pending: Compass — scrolling heading tape with centre pointer + large degrees/cardinal readout -->
 
@@ -310,7 +310,7 @@ Because the heading comes from movement, it only updates while you are actually 
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_6_oled.png) | ![](./tls_scr_6_eink.png) |
+| ![](./ringtone_oled.png) | ![](./ringtone_eink.png) |
 
 A step sequencer for composing custom notification melodies. Two slots — **Melody 1** and **Melody 2** — switchable from within the editor.
 
@@ -351,7 +351,7 @@ Melodies can be assigned in **Settings › Sound** (global default) or overridde
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./tls_scr_7_oled.png) | ![](./tls_scr_7_eink.png) |
+| ![](./autoreply_oled.png) | ![](./autoreply_eink.png) |
 
 Automatically replies to incoming messages that contain a configured trigger word (case-insensitive, contains match).
 
@@ -401,7 +401,7 @@ Commands also work on the **monitored channel** (the one selected for channel mo
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_15_oled.png) | ![](./tls_scr_15_eink.png) |
+| ![](./diagnostics_oled.png) | ![](./diagnostics_eink.png) |
 
 <!-- screenshot pending: Diagnostics — live device/mesh stats rows (uptime, rx/tx counters, heap, RSSI/SNR, queue, errors) -->
 
@@ -434,7 +434,7 @@ The counters make the repeater behaviour observable: **Forwarded** confirms the 
 
 |           OLED             |           E-Ink            |
 | :------------------------: | :------------------------: |
-| ![](./tls_scr_16_oled.png) | ![](./tls_scr_16_eink.png) |
+| ![](./repeater_oled.png) | ![](./repeater_eink.png) |
 
 <!-- screenshot pending: Repeater — toggle + Network/profile + flood-filter rows -->
 

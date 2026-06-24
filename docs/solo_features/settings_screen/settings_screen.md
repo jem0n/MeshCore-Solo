@@ -6,7 +6,7 @@
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./set_scr_1_oled.png) | ![](./set_scr_1_eink.png) |
+| ![](./overview_oled.png) | ![](./overview_eink.png) |
 
 All settings are saved to flash and restored on next boot. Settings are organised into collapsible sections. Press **Enter** on a section header to expand or collapse it — all sections start collapsed for faster navigation. Press **LEFT/RIGHT** to change a value, or **Enter** for toggle items.
 
@@ -50,7 +50,7 @@ Melody 1 and Melody 2 are custom sequences editable in **Tools › Ringtone Edit
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./set_scr_2_oled.png) | ![](./set_scr_2_eink.png) |
+| ![](./homepages_oled.png) | ![](./homepages_eink.png) |
 
 Lists all available home screen pages. For each entry:
 
@@ -76,7 +76,7 @@ Lists all available home screen pages. For each entry:
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./set_scr_3_oled.png) | ![](./set_scr_3_eink.png) |
+| ![](./radio_oled.png) | ![](./radio_eink.png) |
 
 <!-- screenshot pending: Radio — preset popup (pick/save/delete) and/or the digit-by-digit frequency editor -->
 

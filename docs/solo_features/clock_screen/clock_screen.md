@@ -6,7 +6,7 @@
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./clk_scr_1_oled.png) | ![](./clk_scr_1_eink.png) |
+| ![](./overview_oled.png) | ![](./overview_eink.png) |
 
 A full-screen clock page on the home screen. Shows the current time and date, with up to three configurable data fields below.
 
@@ -27,7 +27,7 @@ If no time source is available, the screen shows _"! No time sync"_ with a hint 
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./clk_scr_2_oled.png) | ![](./clk_scr_2_eink.png) |
+| ![](./fields_oled.png) | ![](./fields_eink.png) |
 
 Up to three data fields are shown below the date separator. Each field displays a label and a value on the same line.
 
@@ -54,7 +54,7 @@ Sensor fields show `--` when the sensor is not connected or has no data.
 
 |           OLED            |           E-Ink           |
 | :-----------------------: | :-----------------------: |
-| ![](./clk_scr_3_oled.png) | ![](./clk_scr_3_eink.png) |
+| ![](./config_oled.png) | ![](./config_eink.png) |
 
 <!-- screenshot pending: Dashboard Config — three field slots cycled with LEFT/RIGHT -->
 
