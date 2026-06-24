@@ -12,6 +12,11 @@
 // always resident (UITask::_trail member). The trail survives auto-off (only
 // the display blanks) but is lost on reboot — user explicitly snapshots to a
 // LittleFS slot before powering down to keep it.
+//
+// Samples are simplified in-stream as they arrive (see addPoint()): a straight
+// stretch is stored as just its two endpoints, no matter how long, while a
+// turn still gets a vertex roughly every min-delta of deviation — so CAPACITY
+// covers a much longer route than CAPACITY × min-delta would suggest.
 
 struct TrailPoint {
   int32_t  lat_1e6;
@@ -81,6 +86,7 @@ public:
         _accumulated_ms   += millis() - _session_start_ms;
         _session_start_ms  = 0;
       }
+      flushPending();
       _pending_seg_break = true;
       _paused = false;
     }
@@ -100,6 +106,7 @@ public:
         _accumulated_ms  += millis() - _session_start_ms;
         _session_start_ms = 0;
       }
+      flushPending();
       _pending_seg_break = true;
     } else {
       _session_start_ms = millis();  // resume timing from now
@@ -121,31 +128,52 @@ public:
     _accumulated_ms    = 0;
     _session_start_ms  = 0;
     _paused            = false;
+    _has_pending       = false;
   }
 
-  // Returns true if the point was stored (passed the min-delta gate).
-  // First point of the ring and the first point after a stop/start cycle
-  // get flagged TRAIL_FLAG_SEG_START so the map renderer breaks the line.
+  // Returns true if the sample was accepted (passed the min-delta gate) —
+  // whether that landed it as a new committed vertex right away, or just
+  // extended the pending candidate (see below). First point of the ring and
+  // the first point after a stop/start cycle get flagged TRAIL_FLAG_SEG_START
+  // so the map renderer breaks the line.
+  //
+  // Straight-run simplification: a sample is only ever a *candidate* vertex
+  // (_pending) until the next sample proves it was a real bend. On each new
+  // sample, check whether the previous candidate still lies within
+  // min_delta_m of the straight line from the last committed vertex to this
+  // new sample — if so it was redundant (the run is still straight), drop it
+  // and extend the candidate; if not, the candidate was a genuine corner, so
+  // commit it as a vertex and start a fresh candidate run from there. This
+  // reuses min_delta_m as the simplification tolerance too, so a straight
+  // road costs two stored points (its endpoints) no matter how long it is,
+  // while a curve still gets a vertex every ~min_delta_m of deviation.
   bool addPoint(int32_t lat_1e6, int32_t lon_1e6, uint32_t ts, uint16_t min_delta_m) {
-    if (_count > 0 && !_pending_seg_break) {
-      float d = haversineMeters(last().lat_1e6, last().lon_1e6, lat_1e6, lon_1e6);
+    const TrailPoint* ref = _has_pending ? &_pending : (_count > 0 ? &last() : nullptr);
+    if (ref && !_pending_seg_break) {
+      float d = haversineMeters(ref->lat_1e6, ref->lon_1e6, lat_1e6, lon_1e6);
       if (d < (float)min_delta_m) return false;
     }
-    uint8_t flags = (_count == 0 || _pending_seg_break) ? TRAIL_FLAG_SEG_START : 0;
-    _pending_seg_break = false;
 
-    int pos;
-    if (_count < CAPACITY) {
-      pos = (_head + _count) % CAPACITY;
-      _count++;
-    } else {
-      pos = _head;
-      _head = (_head + 1) % CAPACITY;
+    if (_count == 0 || _pending_seg_break) {
+      flushPending();   // shouldn't normally have one here, but never lose real distance
+      commitPoint(lat_1e6, lon_1e6, ts, TRAIL_FLAG_SEG_START);
+      _pending_seg_break = false;
+      return true;
     }
-    _buf[pos].lat_1e6 = lat_1e6;
-    _buf[pos].lon_1e6 = lon_1e6;
-    _buf[pos].ts      = ts;
-    _buf[pos].flags   = flags;
+
+    TrailPoint sample{ lat_1e6, lon_1e6, ts, 0 };
+    if (!_has_pending) {
+      _pending = sample;
+      _has_pending = true;
+      return true;
+    }
+
+    if (crossTrackMeters(last(), sample, _pending) <= (float)min_delta_m) {
+      _pending = sample;                                            // still straight — extend
+    } else {
+      commitPoint(_pending.lat_1e6, _pending.lon_1e6, _pending.ts, 0);  // real bend — keep it
+      _pending = sample;
+    }
     return true;
   }
 
@@ -205,6 +233,7 @@ public:
   // cleanly. The file is left open for the caller to close.
   template <typename F>
   bool writeTo(F& file) {
+    flushPending();   // the snapshot should include the latest position, not lag behind it
     if (!persist::writeHeader(file, SAVE_MAGIC, SAVE_VERSION, (uint16_t)_count)) return false;
     uint32_t accum = currentAccumulatedMs();
     if (file.write((uint8_t*)&accum, sizeof(accum)) != sizeof(accum)) return false;
@@ -226,6 +255,7 @@ public:
       _session_start_ms = 0;
     }
     _paused = false;
+    _has_pending = false;   // any candidate belonged to the session being replaced
     _head = 0;
     _count = 0;
     for (int i = 0; i < cnt; i++) {
@@ -395,4 +425,51 @@ private:
   bool     _pending_seg_break = false;  // next addPoint flags itself SEG_START
   uint32_t _accumulated_ms   = 0;       // banked active time across previous sessions
   uint32_t _session_start_ms = 0;       // millis() of the current active session, 0 if none
+
+  // Streaming simplification: a sample that passed the min-delta gate but
+  // hasn't been committed as a real vertex yet — see addPoint().
+  bool       _has_pending = false;
+  TrailPoint _pending;
+
+  void commitPoint(int32_t lat_1e6, int32_t lon_1e6, uint32_t ts, uint8_t flags) {
+    int pos;
+    if (_count < CAPACITY) {
+      pos = (_head + _count) % CAPACITY;
+      _count++;
+    } else {
+      pos = _head;
+      _head = (_head + 1) % CAPACITY;
+    }
+    _buf[pos].lat_1e6 = lat_1e6;
+    _buf[pos].lon_1e6 = lon_1e6;
+    _buf[pos].ts      = ts;
+    _buf[pos].flags   = flags;
+  }
+
+  // Commit the pending candidate (if any) as a real vertex. Called before a
+  // segment break (stop/pause/save) so the last stretch of a straight run is
+  // never silently dropped just because no bend came along to force a commit.
+  void flushPending() {
+    if (!_has_pending) return;
+    commitPoint(_pending.lat_1e6, _pending.lon_1e6, _pending.ts, 0);
+    _has_pending = false;
+  }
+
+  // Perpendicular ("cross-track") distance from q to the line through a→b, in
+  // metres. Planar approximation (equirectangular, centred at a) — accurate
+  // enough at trail scale, where consecutive points are metres to a few km
+  // apart. Falls back to a straight distance to a if a and b coincide.
+  static float crossTrackMeters(const TrailPoint& a, const TrailPoint& b, const TrailPoint& q) {
+    static const float M_PER_DEG = 111320.0f;   // metres per degree of latitude
+    float lat_rad   = (a.lat_1e6 * 1e-6f) * ((float)M_PI / 180.0f);
+    float lon_scale = cosf(lat_rad);
+    float bx = (b.lon_1e6 - a.lon_1e6) * 1e-6f * M_PER_DEG * lon_scale;
+    float by = (b.lat_1e6 - a.lat_1e6) * 1e-6f * M_PER_DEG;
+    float ab_len = sqrtf(bx * bx + by * by);
+    if (ab_len < 0.01f) return haversineMeters(a.lat_1e6, a.lon_1e6, q.lat_1e6, q.lon_1e6);
+    float qx = (q.lon_1e6 - a.lon_1e6) * 1e-6f * M_PER_DEG * lon_scale;
+    float qy = (q.lat_1e6 - a.lat_1e6) * 1e-6f * M_PER_DEG;
+    float cross = bx * qy - by * qx;
+    return fabsf(cross) / ab_len;
+  }
 };
