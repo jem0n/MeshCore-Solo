@@ -908,6 +908,12 @@ public:
   }
 
   void commitPickTargetDM(const ContactInfo& ci) {
+    // A room server can't be a live-share target — a [LOC] DM to it is never
+    // reposted to the room's members. Reject the pick and keep the chooser open.
+    if (ci.type == ADV_TYPE_ROOM) {
+      _task->showAlert("Rooms not supported", 1400);
+      return;
+    }
     NodePrefs* p = _task->getNodePrefs();
     if (p) {
       p->loc_share_target_type = 1;

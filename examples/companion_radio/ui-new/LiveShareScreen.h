@@ -139,7 +139,10 @@ public:
       const uint8_t* pre = _prefs->favourite_contacts[i];
       bool empty = true;
       for (int b = 0; b < NodePrefs::FAVOURITE_PREFIX_LEN; b++) if (pre[b]) { empty = false; break; }
-      if (empty || !the_mesh.lookupContactByPubKey(pre, NodePrefs::FAVOURITE_PREFIX_LEN)) continue;
+      ContactInfo* fc = the_mesh.lookupContactByPubKey(pre, NodePrefs::FAVOURITE_PREFIX_LEN);
+      // Skip room servers: a [LOC] DM to a room server isn't reposted to the
+      // room's members, so it can't serve as a live-share broadcast target.
+      if (empty || !fc || fc->type == ADV_TYPE_ROOM) continue;
       list[n].type = 1; list[n].ch = 0;
       memcpy(list[n].prefix, pre, NodePrefs::FAVOURITE_PREFIX_LEN); n++;
     }
