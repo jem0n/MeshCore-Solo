@@ -40,6 +40,7 @@ Select a node to see its coordinates, distance, bearing with cardinal direction,
 | Navigate               | selected node has GPS — for a node sharing live position, the view follows it as it moves and adds an ETA line |
 | Ping                   | a public key is known for the node                                                     |
 | Save waypoint          | selected node has GPS                                                                   |
+| Set as target          | selected node has GPS **and** a public key — pins it as the active **Locator/Nav target** right away (see **Locator**) |
 | Sort: Dist/Recent      | browsing stored nodes — **LEFT/RIGHT** on the row flips distance ↔ last-heard in place |
 | Discover scan / Rescan | always (live `NODE_DISCOVER_REQ` scan)                                                  |
 
@@ -78,10 +79,10 @@ Because it is the same list, all the same keys apply — **UP/DOWN** to navigate
 | :-----------------------: | :-----------------------: |
 | ![](./tls_scr_4_oled.png) | ![](./tls_scr_4_eink.png) |
 
-Records your route in a RAM ring buffer (up to 512 points, sampled every 1 s). Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
+Records your route in a RAM ring buffer (up to 1024 points, sampled every 1 s). The track is **simplified as it's recorded** — a long straight stretch is kept as just its two endpoints while curves keep their detail (bounded to within the **Min dist** tolerance of the real path), so the buffer covers a far longer route than a flat point budget would suggest. Tracking runs in the background — a blinking **G** appears in the status bar. The trail survives display auto-off but is lost on reboot unless saved to flash first.
 
 > [!TIP]
-> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts) with a **north marker**, plus a status line with tracked-node count. The bottom-left corner shows a `->dist` label to the **nearest** tracked contact when one is in range, falling back to a small scale tick otherwise. Press **Enter** to open the full Trail Map; **Hold Enter** shares your position (see **Live Share**); **Back** returns home.
+> The **Map** view is also reachable directly from the home carousel — the **Map** page shows a live mini-preview (your position, trail, and tracked contacts) with a **north marker** and a bottom-left **scale tick**. The status line below reads `Track:N` (tracked-node count) and, when you have a fix and at least one tracked contact, an **arrow + distance** to the **nearest** one (e.g. `Track:3 →120m`). If a **Locator/Nav target** is set it's drawn as a **flag marker** (see **Locator**). Press **Enter** to open the full Trail Map; **Hold Enter** shares your position (see **Live Share**); **Back** returns home.
 
 A GPS fix indicator also sits in the top status bar, alongside the trail/auto-advert/repeater icons — boxed (lit) once the receiver has a valid fix, a plain glyph while still searching. It only appears on boards with GPS hardware and while **GPS** is turned on in Settings; it's hidden the rest of the time rather than sitting there empty.
 
@@ -90,7 +91,7 @@ Cycle views with **LEFT / RIGHT**:
 | View        | Content                                                                                                                                                             |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Summary** | Distance, elapsed time, avg speed or pace, point count, tracking status                                                                                             |
-| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position**, all **waypoints**, and any **live-tracked contacts** (positions shared via Live Share) are always drawn — even with no trail recording — so the map is useful standalone. Point labels are auto-placed to avoid overlapping (a crowded cluster drops some labels rather than smearing them) |
+| **Map**     | Auto-fit dot-and-line plot with cos(lat) aspect correction; segment breaks marked; north arrow; square scale grid fitted to the map frame (toggle under **Hold Enter → Settings → Grid**, Map view only). Your **current GPS position**, all **waypoints**, and any **live-tracked contacts** (positions shared via Live Share) are always drawn — even with no trail recording — so the map is useful standalone. The active **Locator/Nav target**, if set, is drawn as a **flag** on top (folded into the frame so it's never off-screen). Point labels are auto-placed to avoid overlapping (a crowded cluster drops some labels rather than smearing them) |
 | **List**    | Per-point rows showing local time (HH:MM) and delta distance from the previous point; segment-start rows show `start`; scroll with **UP/DOWN**                      |
 
 |           OLED            |           E-Ink           |
@@ -158,7 +159,7 @@ A waypoint is a saved spot — your car, camp, a water source — that you can n
 
 There is no magnetometer, so the screen shows two *absolute* bearings and you compare them: target at 145°, travelling at 90° → bear right. The **Hdg** line is derived from GPS movement (see Compass) and reads `--` until you move.
 
-**Managing** — **Hold Enter** on a waypoint row offers **Rename** / **Delete** / **Send** (the *Trail start* row is navigate-only). Delete removes one at a time; there is no bulk clear.
+**Managing** — **Hold Enter** on a waypoint row offers **Rename** / **Delete** / **Send** / **Set as target** (the *Trail start* row is navigate-only). **Set as target** pins the waypoint as the active **Locator/Nav target** in one step (see **Locator**). Delete removes one at a time; there is no bulk clear.
 
 **Sharing** — **Send** hands the waypoint to the Messages screen: pick a contact or channel, and the message is pre-filled as `[WAY]<lat>,<lon> <label>` (e.g. `[WAY]37.42123,-122.08456 CAR`) for you to confirm or edit before sending. On the receiving device, opening that message and **Hold Enter → Navigate / Save waypoint** turns it back into a navigable point (see *Messages › Fullscreen message view*). The format is plain text, so it stays readable on other firmware and the phone app.
 
@@ -227,6 +228,12 @@ The tool holds both directions of sharing in one flat list. Navigate with **UP/D
 
 ## Locator
 
+|           OLED            |           E-Ink           |
+| :-----------------------: | :-----------------------: |
+| ![](./tls_scr_8_oled.png) | ![](./tls_scr_8_eink.png) |
+
+<!-- screenshot pending: Locator screen with a target set (e.g. "@Bob (5m)"), radius/mode/beeper rows -->
+
 A single **geofence** that beeps and shows an alert when you cross **into** or **out of** a radius. The target can be a **saved waypoint** (a fixed place — "tell me when I'm back at camp") or a **live contact** (a person sharing their position via Live Share — "alert me when my friend gets near / falls behind"). A waypoint target is a **snapshot** (coordinate + label copied), so it keeps working even if you later edit or delete that waypoint; a contact target follows the person's latest shared position.
 
 Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **Cancel/Back** saves and returns to Tools.
@@ -234,16 +241,32 @@ Navigate with **UP/DOWN**, change a value with **LEFT/RIGHT** (or **Enter**); **
 | Setting | Options                          | Notes                                                                                  |
 | ------- | -------------------------------- | -------------------------------------------------------------------------------------- |
 | Alert   | ON / OFF                         | Master switch. Enabling without a target prompts you to pick one.                      |
-| Target  | person or waypoint               | **Enter** opens a picker — **favourites** first, then any active live senders, then waypoints; **UP/DOWN** + **Enter** to choose. **LEFT/RIGHT** quick-cycles the same set in place. A person is shown with an `@` prefix. Shows `none` until set. |
+| Target  | person or waypoint               | **Enter** opens a picker — **favourites** first (offered even with no known position yet, so you can arm ahead of time), then any other contact with a currently-resolvable position (live-sharing *or* just last-advertised, e.g. a repeater), then waypoints; **UP/DOWN** + **Enter** to choose. **LEFT/RIGHT** quick-cycles the same set in place. A person is shown with an `@` prefix, plus a compact **age tag** (e.g. `@Bob (5m)`) when the position is last-advertised rather than a live share. Shows `none` until set. |
 | Radius  | 50 / 100 / 250 / 500 m / 1 km    | Geofence size.                                                                          |
 | Mode    | Arrive / Leave / Both            | Which crossing fires the alert — entering the radius, leaving it, or both.              |
 | Beeper  | ON / OFF                         | Optional homing tone (see below).                                                       |
 
 **Crossing alert.** When armed with a target, the device watches its own GPS fix and fires the alert (a short melody plus an on-screen message) the moment you cross the radius, according to **Mode**. The wording adapts to the target — `Arrived` / `Left` for a waypoint, `Near` / `Away` for a person. The edge has a little hysteresis so a fix hovering right on the boundary doesn't chatter, and the first reading after arming only seeds the in/out state — it won't fire spuriously just because you armed it while already inside.
 
-**Following a person.** Pick a **favourite** (or contact / active live sender) as the target and the geofence tracks the distance *between you and them* using their latest shared position, so it works even while both of you move. You can arm it **ahead of time** — choosing a favourite locks onto their identity (pubkey), and the alert starts working as soon as they share a position. If they stop sharing (their share goes stale), evaluation pauses until a fresh position arrives — it never alerts on an outdated fix. A person must share over a **DM** for it to follow them (a channel share carries no stable identity to lock onto).
+**Following a person.** Pick a **favourite** (or any contact with a known position) as the target and the geofence tracks the distance *between you and them*, so it works even while both of you move. The position is resolved with a fixed precedence: an **active live `[LOC]` share** wins, and with no current share it **falls back to the contact's last-advertised GPS position** — so a rarely-updating but stationary node (a repeater, or someone who shared a fix once) still works as a target. You can arm it **ahead of time** — choosing a favourite locks onto their identity (pubkey), and the alert starts working as soon as a position is known. Live following requires a **DM** share (a channel share carries no stable identity to lock onto); the last-advertised fallback works for any contact regardless.
 
 **Proximity beeper.** With **Beeper** on, the device also ticks while you're inside the radius and **shortens the gap between ticks the closer you get to the target** — slow near the edge, rapid near the centre — like a homing beeper guiding you to the exact spot. It's silent outside the radius. Because the beeper is its own opt-in toggle, turning it on **overrides the global buzzer mute** (**Settings › Sound › Buzzer**) — it's an explicit "I want to hear this". It works independently of the arrive/leave crossing alert (which does follow the mute), so you can use either or both.
+
+**Setting the target from anywhere.** Besides this screen's picker, the *same* active target can be set in one step with **Set as target** from **Nearby Nodes**' or **Waypoints**' own **Hold Enter** menu — handy so you don't need a detour through Tools. Picking from this screen's picker saves on exit (so **LEFT/RIGHT** cycling stays cheap); the per-item shortcuts save immediately and confirm with a `Target set` toast.
+
+**On the map.** Whatever the active target is — person or waypoint — it's drawn as a **flag marker** on both the home **Map** preview and the full **Trail Map**, on top of any waypoint/contact it overlaps and folded into the frame so it never sits off-screen. This shows even when the **Alert** master switch is off, so a target you set purely to navigate to still appears.
+
+|              OLED               |              E-Ink              |
+| :-----------------------------: | :-----------------------------: |
+| ![](./tls_scr_9_oled.png)       | ![](./tls_scr_9_eink.png)       |
+
+<!-- screenshot pending: PICK TARGET picker — favourites, a last-advertised contact with age tag (e.g. "@Bob (5m)"), and waypoints -->
+
+|              OLED               |              E-Ink              |
+| :-----------------------------: | :-----------------------------: |
+| ![](./tls_scr_10_oled.png)      | ![](./tls_scr_10_eink.png)      |
+
+<!-- screenshot pending: Trail Map (or home Map preview) with the active-target flag marker visible -->
 
 > [!TIP]
 > Mark the spot first with **Tools › Trail → Hold Enter → Mark here** (or **+ Add by coords**), then set it as the Locator target.

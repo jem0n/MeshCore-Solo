@@ -37,7 +37,7 @@ All firmware files are published on the [releases page](https://github.com/Marek
   - **Navigate to anything** — a saved waypoint, a node straight from Nearby Nodes, or a location someone shares with you in a message
   - **Share & save locations** — send a waypoint to a contact or channel; on the other end, navigate to or save any shared location with one menu
   - **Live location sharing** — broadcast your position over the mesh as you move (movement-gated, to a channel or contact) and see others who share theirs as pins on the map and live distance/bearing in Nearby
-  - **Geo-alert** — arm a geofence around a saved waypoint and get an alert when you arrive or leave, with an optional homing beeper that ticks faster the closer you get
+  - **Locator** — arm a geofence around a target — a saved waypoint *or* a person (their live/last-known position) — and get an alert when you arrive/leave or they get near/far, with an optional homing beeper that ticks faster the closer you get. Set it from the Locator screen or straight from Nearby Nodes / Waypoints, and see the target as a flag on the map
   - **GPS trail** — background route recording with an auto-fit map (waypoints + live position), summary stats, auto-pause on stops, and [GPX export](#solo-tools)
   - **Metric or imperial** — one global Units setting drives every distance and speed across the UI
 
