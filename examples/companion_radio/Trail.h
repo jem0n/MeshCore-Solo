@@ -8,7 +8,7 @@
 #include "GeoUtils.h"
 
 // RAM-only GPS trail ring buffer.
-// Storage cost: CAPACITY(512) × sizeof(TrailPoint)(16 B, padded) = 8 KB,
+// Storage cost: CAPACITY(1024) × sizeof(TrailPoint)(16 B, padded) = 16 KB,
 // always resident (UITask::_trail member). The trail survives auto-off (only
 // the display blanks) but is lost on reboot — user explicitly snapshots to a
 // LittleFS slot before powering down to keep it.
@@ -24,7 +24,7 @@ static const uint8_t TRAIL_FLAG_SEG_START = 0x01;
 
 class TrailStore {
 public:
-  static const int CAPACITY = 512;
+  static const int CAPACITY = 1024;
   // _count is serialised as uint16_t in the save header — fail the build loudly
   // if CAPACITY is ever grown past what that can hold, rather than truncating.
   static_assert(CAPACITY <= 0xFFFF, "TrailStore::CAPACITY must fit in the uint16_t save-header count");
