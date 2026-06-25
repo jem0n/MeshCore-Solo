@@ -147,10 +147,17 @@ public:
   // proves the run has bent. The corridor is the straight line anchored at the
   // last committed vertex and aimed at the first sample of this run (_dir);
   // each new sample is tested against *that fixed line*. While it stays within
-  // min_delta_m of the corridor the run is still "straight enough", so drop
-  // the intermediate and extend; once a sample leaves the corridor the
-  // previous in-corridor sample (_pending) was the last good vertex, so commit
-  // it and open a fresh corridor from there.
+  // CORRIDOR_FACTOR x min_delta_m of the corridor the run is still "straight
+  // enough", so drop the intermediate and extend; once a sample leaves the
+  // corridor the previous in-corridor sample (_pending) was the last good
+  // vertex, so commit it and open a fresh corridor from there.
+  //
+  // The corridor is deliberately tighter than the min-delta gate itself
+  // (CORRIDOR_FACTOR < 1): the gate is the noise floor for *rejecting* samples
+  // outright, while the corridor decides when a run has bent enough to need a
+  // new vertex. Field data showed plenty of headroom (4 km at a 10 m gate cost
+  // just 38 of the 512-point capacity), so a tighter corridor trades some of
+  // that headroom for a polyline that hugs the real track more closely.
   //
   // The fixed direction is the whole point: testing the newest sample against
   // a line that re-aims at the newest sample (or testing the previous
@@ -158,8 +165,13 @@ public:
   // cross-track is near zero) lets a long gentle curve slip through one
   // sub-min_delta step at a time and collapse to a single chord that deviates
   // arbitrarily far. Anchoring the direction bounds the stored polyline to
-  // ~min_delta_m of the real track, while a straight road still costs just its
-  // two endpoints no matter how long it is.
+  // ~CORRIDOR_FACTOR x min_delta_m of the real track, while a straight road
+  // still costs just its two endpoints no matter how long it is.
+  // How much tighter the simplification corridor is than the min-delta gate
+  // (see addPoint() above). 1.0 would track the gate exactly; lowering this
+  // commits more vertices per route (more fidelity, less reduction).
+  static constexpr float CORRIDOR_FACTOR = 0.5f;
+
   bool addPoint(int32_t lat_1e6, int32_t lon_1e6, uint32_t ts, uint16_t min_delta_m) {
     const TrailPoint* ref = _has_pending ? &_pending : (_count > 0 ? &last() : nullptr);
     if (ref && !_pending_seg_break) {
@@ -182,7 +194,7 @@ public:
       return true;
     }
 
-    if (crossTrackMeters(last(), _dir, sample) <= (float)min_delta_m) {
+    if (crossTrackMeters(last(), _dir, sample) <= (float)min_delta_m * CORRIDOR_FACTOR) {
       _pending = sample;                                            // within corridor — extend
     } else {
       commitPoint(_pending.lat_1e6, _pending.lon_1e6, _pending.ts, 0);  // left corridor — keep last good
