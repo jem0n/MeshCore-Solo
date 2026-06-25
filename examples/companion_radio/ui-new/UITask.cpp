@@ -54,9 +54,12 @@ public:
     strncpy(_version_info, MESHCORE_VERSION, sizeof(_version_info) - 1);
     _version_info[sizeof(_version_info) - 1] = '\0';
 
-    // Solo firmware version: strip commit hash suffix (v1.15-solo.1-abcdef -> v1.15)
+    // Solo firmware version: strip the commit-hash suffix build.sh always
+    // appends as the LAST dash-segment (v1.15-solo.1-abcdef -> v1.15-solo.1).
+    // Must be the last dash, not the first: a tag like v1.21-rc1 has a dash
+    // of its own before the commit hash gets appended.
     const char *ver = FIRMWARE_VERSION;
-    const char *dash = strchr(ver, '-');
+    const char *dash = strrchr(ver, '-');
     int plen = dash ? (int)(dash - ver) : (int)strlen(ver);
     if (plen >= (int)sizeof(_solo_ver)) plen = sizeof(_solo_ver) - 1;
     memcpy(_solo_ver, ver, plen);
