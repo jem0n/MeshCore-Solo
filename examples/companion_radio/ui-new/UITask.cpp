@@ -622,9 +622,10 @@ public:
     // Active target flag drawn last so it stays legible even atop a contact/own dot.
     if (have_tgt) { int px, py; project(tla, tlo, px, py); miniIconDrawCentered(display, px, py, ICON_MAP_TARGET); }
 
-    // Bottom-left scale reference, always shown — distance to the nearest
-    // live-tracked contact now lives on the status line below instead (see
-    // nearestTrackedKm() / render()), so this corner is free for it.
+    // Bottom-left scale reference, always shown — distance to the active
+    // target (or else the nearest live-tracked contact) now lives on the
+    // status line below instead (see statusDistanceKm() / render()), so this
+    // corner is free for it.
     {
       display.setColor(DisplayDriver::LIGHT);
       int ty = ay + ah - display.getLineHeight();
@@ -654,12 +655,17 @@ public:
     return true;
   }
 
-  // Distance to the nearest live-tracked ([LOC]-sharing) contact, in km, or
-  // -1 when we don't have a fix or there's no active share to measure
-  // against. Shared by the MAP status line (see render()).
-  float nearestTrackedKm() {
+  // Distance shown on the MAP status line. The active Locator/Nav target
+  // takes priority — that's what the flag on the mini-map is pointing at,
+  // and it's the only way a waypoint target ever gets a distance readout
+  // here (a waypoint isn't a live-tracked contact). Falls back to the
+  // nearest live-tracked ([LOC]-sharing) contact when no target is set.
+  // -1 when we don't have a fix or nothing to measure against.
+  float statusDistanceKm() {
     int32_t mla, mlo;
     if (!_task->currentLocation(mla, mlo)) return -1.0f;
+    int32_t tla, tlo;
+    if (_task->activeTargetPos(tla, tlo)) return geo::haversineKm(mla, mlo, tla, tlo);
     LiveTrackStore& lt = _task->liveTrack();
     uint32_t now = rtc_clock.getCurrentTime();
     float nearest_km = -1.0f;
@@ -1084,10 +1090,10 @@ public:
       LiveTrackStore& lt = _task->liveTrack();
       int trk = lt.active(now_m);
       // Fix state lives in the top-bar GPS icon. Track count plus an arrow +
-      // distance to the nearest live-tracked contact (when we have both a fix
-      // and an active share) share this one status line.
+      // distance (to the active target, else the nearest live-tracked
+      // contact) share this one status line.
       snprintf(left, sizeof(left), "Track:%d", trk);
-      float nearest_km = nearestTrackedKm();
+      float nearest_km = statusDistanceKm();
       if (nearest_km >= 0.0f) geo::fmtDist(right, sizeof(right), nearest_km, _task->useImperial());
       display.setColor(DisplayDriver::LIGHT);
       if (!drew)
