@@ -740,19 +740,9 @@ private:
       int x0, y0;
       proj.project(_store->at(0).lat_1e6, _store->at(0).lon_1e6, x0, y0);
       miniIconDrawCentered(display, x0, y0, ICON_MAP_DOT);
-      for (int i = 1; i < _store->count(); i++) {
-        const TrailPoint& pt = _store->at(i);
-        int x1, y1;
-        proj.project(pt.lat_1e6, pt.lon_1e6, x1, y1);
-        if (pt.flags & TRAIL_FLAG_SEG_START) {
-          drawFilledDot(display, x0, y0);
-          drawOpenDot(display, x1, y1);
-        } else {
-          gfx::drawLine(display, x0, y0, x1, y1);
-        }
-        x0 = x1;
-        y0 = y1;
-      }
+      gfx::drawTrail(display, *_store,
+        [&](int32_t la, int32_t lo, int& x, int& y) { proj.project(la, lo, x, y); },
+        [&](int xa, int ya, int xb, int yb) { drawFilledDot(display, xa, ya); drawOpenDot(display, xb, yb); });
       int sx, sy;
       proj.project(_store->first().lat_1e6, _store->first().lon_1e6, sx, sy);
       drawStartMarker(display, sx, sy);

@@ -34,6 +34,7 @@
 #endif
 
 #include "icons.h"
+#include "GfxUtils.h"   // gfx::drawLine — connects trail points on the Home map preview
 
 // Blinking status indicators: on for the first half of a 4 s cycle, but e-ink
 // can't repaint fast enough to blink, so it shows them steadily.
@@ -554,8 +555,9 @@ public:
 
   // Compact map preview for the Home "Map" page: own position, the GPS trail,
   // and live-tracked contacts (◆) folded into one auto-scaled box. A simplified
-  // cousin of TrailScreen's map (dots, no grid/labels) so the home carousel
-  // stays light. Returns false (and draws nothing) when there's nothing to show.
+  // cousin of TrailScreen's map (no grid/labels, no break markers) so the home
+  // carousel stays light. Returns false (and draws nothing) when there's
+  // nothing to show.
   bool drawMapPreview(DisplayDriver& display, int ax, int ay, int aw, int ah) {
     if (aw < 8 || ah < 8) return false;
     bool init = false;
@@ -608,11 +610,9 @@ public:
       px = off_x + (int)((float)(lo - mnlo) * lon_scale * scale);
       py = off_y + (int)((float)(mxla - la) * scale);
     };
-    // Trail as dots (no line — gfx isn't available this early in the TU).
-    for (int i = 0; i < tr.count(); i++) {
-      int px, py; project(tr.at(i).lat_1e6, tr.at(i).lon_1e6, px, py);
-      display.fillRect(px, py, 1, 1);
-    }
+    // Trail as a connected line, matching the full Trail map (shared helper —
+    // see gfx::drawTrail); no break marker here, just a silent gap.
+    gfx::drawTrail(display, tr, project, [](int, int, int, int) {});
     for (int i = 0; i < LiveTrackStore::CAPACITY; i++) {
       if (!lt.isActive(i, now)) continue;
       int px, py; project(lt.slotAt(i).lat_1e6, lt.slotAt(i).lon_1e6, px, py);
